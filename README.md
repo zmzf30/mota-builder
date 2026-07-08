@@ -2,7 +2,7 @@
 
 基于 `mota-js`、Python 和 AI Agent 终端（必须安装并配置Agent Cli环境，默认使用并建议使用 Codex CLI，推荐不低于 GPT-5.5 xhigh 能力的模型；同时也支持通过 `--agent-backend opencode` 使用 OpenCode）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
 
-`mota-js/` 是本地 HTML5 魔塔样板工程目录，需要您clone https://github.com/ckcz123/mota-js 并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
+mota-js 是 HTML5 魔塔样板，需要您clone https://github.com/ckcz123/mota-js 并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
 
 ## 马上上手
 
