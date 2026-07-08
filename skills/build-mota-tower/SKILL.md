@@ -22,7 +22,7 @@ Convert the user's natural-language request into parameters for `scripts/build_m
 ## Execution Modes
 
 - Use `--brief-only` when the user is still describing an idea, asking to start with global confirmation, or has not explicitly approved full generation.
-- Use full generation with `--yes` only when the user clearly asks to generate/build/run the whole pipeline or confirms the brief.
+- Use full generation with `--yes` when the user clearly asks to generate/build/run the whole pipeline or confirms the brief. Phrases like "我想直接一步生成一个……的塔" explicitly mean full generation, not `--brief-only`.
 - Use `--brief-file <path>` when the user points to an existing confirmed `tower_brief.json`.
 - Use `--floors <n>` when the user states a floor count outside the free-text idea.
 - Use `--floor-size <9|11|13>` when the user states a supported map size outside the free-text idea. Default is 11x11.

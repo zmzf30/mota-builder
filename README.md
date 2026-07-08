@@ -4,6 +4,28 @@
 
 `mota-js/` 是本地 HTML5 魔塔样板工程目录，需要您clone https://github.com/ckcz123/mota-js并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
 
+## 新用户最快开始
+
+在本仓库目录下打开 AI 终端（如 Codex 或 OpenCode），可以直接输入：
+
+```text
+我想直接一步生成一个 6 层、11x11、低剧情、高数值压力、传统钥匙门博弈的塔。
+```
+
+AI 终端会代为调用本仓库的生成脚本，默认使用 Codex 后端，生成结果写入 `build/mota-tower/`，不会直接覆盖 `mota-js/project/`。如果要用 OpenCode，在提示词末尾追加：
+
+```text
+使用 --agent-backend opencode，并使用模型 deepseek/deepseek-chat。
+```
+
+生成完成后重点查看：
+
+- `build/mota-tower/summary.json`
+- `build/mota-tower/project/`
+- `build/mota-tower/playtests/`
+
+需要使用生成内容时，将生成产物替换到 `mota-js/project/` 下的对应文件即可。
+
 ## 适用场景
 
 - 直接打开 `mota-js` 样板，手工制作或调试 HTML5 魔塔。
@@ -126,6 +148,18 @@ python3 scripts/build_mota_tower.py \
   --out-dir build/mota-tower
 ```
 
+也可以在 AI 终端中使用更明确的完整提示词：
+
+```text
+请在当前仓库中调用 scripts/build_mota_tower.py，一步生成一座 6 层、11x11、低剧情、高数值压力、传统钥匙门博弈的魔塔。使用默认 Codex 后端，不要直接覆盖 mota-js/project，输出到 build/mota-tower。
+```
+
+如果要用 OpenCode，在提示词末尾追加：
+
+```text
+使用 --agent-backend opencode，并使用模型 deepseek/deepseek-chat。
+```
+
 常用参数：
 
 - `--floors <n>`：指定楼层数。
@@ -139,7 +173,7 @@ python3 scripts/build_mota_tower.py \
 - `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认还会传 `model_reasoning_effort="xhigh"` 和 `service_tier="priority"`。
 - `--codex-arg <arg>`：额外传给 `codex exec` 的原始参数，可重复。
 - `--opencode-arg <arg>`：额外传给 `opencode run` 的原始参数，可重复。使用 OpenCode 时不会传 Codex 专用的 `model_reasoning_effort` 或 `service_tier`。
-- `--timeout <seconds>`：单次 agent 调用超时时间，默认 `900` 秒（15 分钟）。
+- `--timeout <seconds>`：单次 agent 调用超时时间，默认 `1200` 秒（20 分钟）。
 - `--skip-playtest`：跳过浏览器试玩。
 - `--keep-prompts`：保留每个阶段发给 agent 的 prompt，方便调试。
 - `--self-test`：运行脚本内置本地测试，不调用外部 agent。

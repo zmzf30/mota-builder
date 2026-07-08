@@ -38,7 +38,7 @@ DEFAULT_CODEX_CONFIG = [
     'service_tier="priority"',
 ]
 AGENT_BACKENDS = ("codex", "opencode")
-DEFAULT_AGENT_TIMEOUT_SECONDS = 900
+DEFAULT_AGENT_TIMEOUT_SECONDS = 1200
 
 RESOURCE_WEIGHT_BY_ID = {
     "redGem": 1.0,
