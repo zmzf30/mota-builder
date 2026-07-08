@@ -1,0 +1,36 @@
+{
+  "status": "fail",
+  "issues": [
+    {
+      "owner_stage": "monster",
+      "severity": "fail",
+      "coordinates": [
+        [
+          7,
+          7
+        ],
+        [
+          11,
+          7
+        ]
+      ],
+      "reason": "Monster annotations assign special 15 to (7,7) and special 18 to (11,7), but the concrete floor map only places enemy codes 203 and 209, whose current stats both have special=0. There is no floor data, event data, or static special source showing these as actual zone/repulse monsters.",
+      "required_change": "Make the intended specials concrete in the floor data using whitelist specials with at most one special per monster, or remove the special-pressure claims and rebalance/compensate the placements as ordinary no-special enemies."
+    }
+  ],
+  "required_changes": [
+    "Make the intended specials concrete in the floor data using whitelist specials with at most one special per monster, or remove the special-pressure claims and rebalance/compensate the placements as ordinary no-special enemies."
+  ],
+  "budget_delta": {
+    "yellow_doors": 4,
+    "blue_doors": 1,
+    "red_doors": 0,
+    "yellow_keys": 4,
+    "blue_keys": 1,
+    "red_keys": 0,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 0
+  },
+  "summary": "Local monster review passed. | Monster codes are allowed and enemy tiles are not orthogonally adjacent, but the claimed special placements are not concrete in the actual floor data."
+}

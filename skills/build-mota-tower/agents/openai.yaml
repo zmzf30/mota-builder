@@ -1,0 +1,4 @@
+interface:
+  display_name: "构建魔塔"
+  short_description: "Run the mota tower build pipeline"
+  default_prompt: "Use $build-mota-tower to choose pipeline parameters and run the tower build orchestrator."

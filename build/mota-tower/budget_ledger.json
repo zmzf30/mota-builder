@@ -1,0 +1,24 @@
+{
+  "limits": {
+    "yellow_doors": 16,
+    "blue_doors": 5,
+    "red_doors": 1,
+    "yellow_keys": 14,
+    "blue_keys": 4,
+    "red_keys": 1,
+    "pickaxes": 1,
+    "bombs": 1,
+    "centerFly": 0
+  },
+  "used": {
+    "yellow_doors": 16,
+    "blue_doors": 5,
+    "red_doors": 1,
+    "yellow_keys": 14,
+    "blue_keys": 4,
+    "red_keys": 1,
+    "pickaxes": 1,
+    "bombs": 1,
+    "centerFly": 0
+  }
+}

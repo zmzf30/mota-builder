@@ -1,0 +1,4 @@
+interface:
+  display_name: "魔塔经济生成"
+  short_description: "Fill floor economy without choosing monsters"
+  default_prompt: "Use $economy-mota-floor to add doors, keys, resources, tools, and combat annotations to a topology floor."

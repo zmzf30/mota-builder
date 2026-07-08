@@ -1,0 +1,29 @@
+{
+  "status": "fail",
+  "issues": [
+    "Large direct resource region [7,1]->[8,1] has resource_weight=6.0, resources=2, gems=0: centerFly@[7,1], pickaxe@[8,1].",
+    "Gem regions [1,1]->[2,2] and [1,4]->[1,6] are connected by an unusually easy route: score=0.42, hp_loss=2.0, key_cost=0.0, enemies=1, doors=0, steps=2; path [1,2]->[1,3]->[1,4].",
+    "Gem regions [8,4]->[11,7] and [10,8]->[10,8] are connected by an unusually easy route: score=1.19, hp_loss=0.0, key_cost=1.0, enemies=0, doors=1, steps=2; path [11,7]->[11,8]->[10,8].",
+    "Gem regions [8,4]->[11,7] and [11,9]->[11,10] are connected by an unusually easy route: score=1.19, hp_loss=0.0, key_cost=1.0, enemies=0, doors=1, steps=2; path [11,7]->[11,8]->[11,9].",
+    "Gem regions [10,8]->[10,8] and [11,9]->[11,10] are connected by an unusually easy route: score=1.19, hp_loss=0.0, key_cost=1.0, enemies=0, doors=1, steps=2; path [10,8]->[11,8]->[11,9]."
+  ],
+  "required_changes": [
+    "Rebuild direct resource region [7,1]->[8,1]: split the resources into staged sub-regions and add pressure on the easiest internal route before the richest rewards.",
+    "Rebuild the connection between gem regions [1,1]->[2,2] and [1,4]->[1,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [8,4]->[11,7] and [10,8]->[10,8]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [8,4]->[11,7] and [11,9]->[11,10]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [10,8]->[10,8] and [11,9]->[11,10]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices."
+  ],
+  "budget_delta": {
+    "yellow_doors": 0,
+    "blue_doors": 0,
+    "red_doors": 0,
+    "yellow_keys": 0,
+    "blue_keys": 0,
+    "red_keys": 0,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 0
+  },
+  "summary": "Gem route balance reviewer found 5 route/resource imbalance issue(s)."
+}

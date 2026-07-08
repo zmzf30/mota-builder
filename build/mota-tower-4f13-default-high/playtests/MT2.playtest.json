@@ -1,0 +1,7 @@
+{
+  "status": "skipped",
+  "summary": "1055/1056 already served another process; skipped to avoid playtesting the wrong project.",
+  "issues": [
+    "Stop the existing local mota-js server or run without --project-dir to test that server."
+  ]
+}

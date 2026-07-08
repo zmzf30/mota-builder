@@ -1,0 +1,111 @@
+{
+  "status": "ready",
+  "summary": "4层13x13传统魔塔，高怪物压力，不要求数值上保证通关；全塔精确放置22红宝石、22蓝宝石、22绿宝石、30红血瓶、10蓝血瓶、3个破墙镐和2个中心对称飞行器。",
+  "floor_count": 4,
+  "floor_size": 13,
+  "fixed_rules": [
+    "13x13 floors",
+    "initial position is MT0 (6,11)",
+    "initial hero lv=1 hp=300 atk=10 def=10 money=0",
+    "starting keys: yellow=1, blue=0, red=0",
+    "equipment=[], constants includes book=1, tools={}, equips={}",
+    "one global shop shop1: 40 gold for atk+1 or def+1",
+    "MT0 must expose shop1 at coordinate (1,9) by setting floor.events[\"1,9\"] exactly to an openShop event for id shop1, for example [{\"type\":\"openShop\",\"id\":\"shop1\",\"open\":true}]; the map cell may be ground or moneyShop but the coordinate-bound event must exist",
+    "levelUp disabled",
+    "monster difficulty is high; numeric clearability is not guaranteed or required",
+    "exact whole-tower resources: redGem=22, blueGem=22, greenGem=22, redPotion=30, bluePotion=10, pickaxe=3, centerFly=2",
+    "per-floor exact resource quotas: MT0 redGem=5 blueGem=5 greenGem=5 redPotion=7 bluePotion=2 pickaxe=1 centerFly=0",
+    "per-floor exact resource quotas: MT1 redGem=5 blueGem=5 greenGem=5 redPotion=7 bluePotion=2 pickaxe=1 centerFly=1",
+    "per-floor exact resource quotas: MT2 redGem=5 blueGem=5 greenGem=5 redPotion=7 bluePotion=2 pickaxe=1 centerFly=0",
+    "per-floor exact resource quotas: MT3 redGem=7 blueGem=7 greenGem=7 redPotion=9 bluePotion=4 pickaxe=0 centerFly=1"
+  ],
+  "global_limits": {
+    "yellow_doors": 23,
+    "blue_doors": 8,
+    "red_doors": 0,
+    "yellow_keys": 13,
+    "blue_keys": 4,
+    "red_keys": 0,
+    "pickaxes": 3,
+    "bombs": 0,
+    "centerFly": 2
+  },
+  "global_settings": {
+    "initial_hero": {
+      "lv": 1,
+      "hp": 300,
+      "atk": 10,
+      "def": 10,
+      "money": 0,
+      "keys": {
+        "yellow": 1,
+        "blue": 0,
+        "red": 0
+      },
+      "equipment": [],
+      "constants": {
+        "book": 1
+      },
+      "tools": {},
+      "equips": {}
+    },
+    "gems": {
+      "redGem": 1,
+      "blueGem": 1,
+      "greenGem": 5
+    },
+    "potions": {
+      "redPotion": 80,
+      "bluePotion": 200,
+      "yellowPotion": 500,
+      "greenPotion": 800
+    },
+    "shop": {
+      "enabled": true,
+      "id": "shop1",
+      "rule": "40 gold buys atk+1 or def+1",
+      "atk_gain": 1,
+      "def_gain": 1,
+      "cost": 40
+    },
+    "levelUp": {
+      "enabled": false
+    }
+  },
+  "monster_policy": {
+    "allowed_specials": [
+      1,
+      2,
+      3,
+      15,
+      18
+    ],
+    "max_specials_per_monster": 1,
+    "min_no_special_ratio": 0.5,
+    "monster_types_per_floor": 9,
+    "floor_overlap_ratio": 0.7,
+    "special_damage_red_potion_min": 0.5,
+    "special_damage_red_potion_max": 1.0,
+    "no_adjacent_enemies": true,
+    "difficulty": "high",
+    "guarantee_clearable": false
+  },
+  "resource_policy": {
+    "gem_floor_delta_min": 0,
+    "gem_floor_delta_max": 6,
+    "potion_floor_delta_min": 0,
+    "potion_floor_delta_max": 7,
+    "potion_compare_mode": "red_potion_equiv"
+  },
+  "layout_policy": [
+    "each floor uses the requested downFloor at (6,11) and upFloor at (6,1)",
+    "shop1 is placed on MT0 at (1,9) and enabled/opened by an explicit openShop event in floor.events[\"1,9\"]",
+    "yellow doors create baseline key pressure; blue doors protect stronger reward branches",
+    "place the large gem and potion quota behind combat, doors, route length, wall-breaking, zone, or repulse pressure; no naked resource piles",
+    "on MT0, the opening split after the first combat on each branch may expose at most one gem, potion, key, or tool per branch before a second combat or door gate",
+    "on MT0, blue-door rewards must not be reachable through a cheaper yellow-door or no-door bypass",
+    "use high monster density and high monster cost, but do not require route simulation to prove the final tower is numerically clearable"
+  ],
+  "questions": [],
+  "confirmation_prompt": "确认按此 brief 生成 4 层 13x13 高难度魔塔。"
+}

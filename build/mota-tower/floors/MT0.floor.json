@@ -1,0 +1,1069 @@
+{
+  "floor_id": "MT0",
+  "floor_index": 0,
+  "floor_size": 13,
+  "summary": "Monster stage for MT0 preserves the economy map and quotas while converting all combat and special-pressure candidates into allowed enemy tiles. Seven non-adjacent monsters create distinct main-route, detour, reward-guard, branch-special, and final precheck roles; the northwest pickaxe guard is locally adjusted to [1,2] so it guards the actual reward approach. Manual repair: moved northwest pickaxe guard out of [1,2]. Manual repair: moved northwest pickaxe guard into [3,3].",
+  "floor": {
+    "floorId": "MT0",
+    "title": "Main Tower 0F",
+    "name": "0",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        47,
+        0,
+        1,
+        0,
+        0,
+        29,
+        23,
+        203,
+        83,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        81,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        205,
+        0,
+        21,
+        27,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        22,
+        32,
+        81,
+        1,
+        0,
+        21,
+        0,
+        1,
+        82,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        203,
+        1,
+        1,
+        1,
+        31,
+        1,
+        31,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        202,
+        1,
+        201,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        202,
+        1,
+        21,
+        1,
+        28,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        81,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        81,
+        1,
+        49,
+        1
+      ],
+      [
+        1,
+        88,
+        0,
+        21,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        82,
+        205,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "central-east main route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Primary readable route from the entrance to the exit, now carrying a mid-route redSlime check and a blackSlime final precheck before the red door.",
+      "tags": [
+        "candidate_routes",
+        "main_route",
+        "entrance_to_exit",
+        "monsterized"
+      ],
+      "data": "length=29;role=primary;doors=9_10,5_2,10_1;monsters=202_at_9_7,203_at_9_1"
+    },
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "northwest detour route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Long detour remains structurally intact and is distinguished by lower-route combat, a blue-key pocket endurance guard, and a pickaxe-approach bat.",
+      "tags": [
+        "candidate_routes",
+        "detour_route",
+        "route_commitment",
+        "monsterized"
+      ],
+      "data": "length=41;role=detour;yellow_gates=3_9,5_5;tool_reward=2_1;monsters=202_at_7_8,203_at_5_6,205_at_3_3"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "entrance promenade",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ]
+      ],
+      "description": "Entrance free region remains controlled: only one starter yellow key is freely exposed, and the east branch starts with a blue door plus a bat guard after entry.",
+      "tags": [
+        "regions",
+        "entrance",
+        "staging_space"
+      ],
+      "data": "free_reward=yellowKey_at_3_11;main_gate=9_10;west_loop_gate=3_9;blue_gate=10_11;east_branch_guard=205_at_11_11"
+    },
+    {
+      "stage": "economy",
+      "kind": "resource_quota",
+      "label": "exact tracked quota placement",
+      "coordinates": [
+        [
+          9,
+          10
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          11,
+          10
+        ]
+      ],
+      "description": "All tracked resources for the floor contract remain placed exactly once; monster placement uses only empty route or branch tiles.",
+      "tags": [
+        "quota",
+        "doors",
+        "keys",
+        "tools",
+        "preserved"
+      ],
+      "data": "yellow_doors=4;blue_doors=2;red_doors=1;yellow_keys=4;blue_keys=1;red_keys=1;pickaxes=1;bombs=1;centerFly=0"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "starter yellow gate",
+      "coordinates": [
+        [
+          3,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          8
+        ]
+      ],
+      "description": "The first yellow key still pays for the bottom-to-hub yellow door; the next key appears after that commitment before the first main-route monster.",
+      "tags": [
+        "main_route",
+        "yellow_key_flow",
+        "entrance_control"
+      ],
+      "data": "cost=1_yellow_key;refund_after_gate=1_yellow_key;first_monster_after_gate=202_at_9_7"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "west-loop bypass gate",
+      "coordinates": [
+        [
+          3,
+          11
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          3,
+          7
+        ]
+      ],
+      "description": "The west loop remains gated by a yellow door and now faces a distinct detour combat line rather than a free bypass.",
+      "tags": [
+        "repair",
+        "entrance_control",
+        "yellow_door",
+        "alternate_route"
+      ],
+      "data": "blocks_free_bypass=true;door=3_9;detour_monsters=202_at_7_8,203_at_5_6,205_at_3_3"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "upper yellow gate",
+      "coordinates": [
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ]
+      ],
+      "description": "The central spine still feeds enough yellow keys to pay the upper approach gate while supporting the final red-key route.",
+      "tags": [
+        "main_route",
+        "yellow_doors",
+        "progression"
+      ],
+      "data": "door=5_2;keys=8_5,5_3;supports_red_key_access=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "final red gate",
+      "coordinates": [
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "The red key remains shortly before the red door; blackSlime at [9,1] is the mandatory final precheck before spending the red key.",
+      "tags": [
+        "main_route",
+        "red_gate",
+        "exit_pressure",
+        "monsterized"
+      ],
+      "data": "cost=1_red_key;red_key=8_1;precheck=203_at_9_1;red_door=10_1;upFloor=11_1;bypass_sealed_at_10_2"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "sealed red-door bypass approach",
+      "coordinates": [
+        [
+          10,
+          2
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "The lower approach to the final red door remains sealed at [10,2], so the east branch cannot bypass the [9,1] final monster precheck.",
+      "tags": [
+        "repair",
+        "anti_bypass",
+        "red_gate",
+        "blue_door"
+      ],
+      "data": "sealed_tile=10_2;relocated_blueDoor=11_5;red_gate_non_bypassable=true;mandatory_precheck=203_at_9_1"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "optional central blue-key branch",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          4,
+          5
+        ]
+      ],
+      "description": "The yellow-door branch still buys access to the only blue key and blue potion, with blackSlime at [5,6] making the branch an earned choice.",
+      "tags": [
+        "optional_branch",
+        "yellow_door",
+        "blue_key",
+        "monsterized"
+      ],
+      "data": "cost=1_yellow_key;guard=203_at_5_6;reward=blueKey_at_3_5,bluePotion_at_4_5;branch_rejoins_upper_detour"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "optional east blue branch",
+      "coordinates": [
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          5
+        ]
+      ],
+      "description": "The east branch remains locked by blue doors and now has a bat entry guard plus a greenSlime special-pressure point on the reward line.",
+      "tags": [
+        "optional_branch",
+        "blue_door",
+        "tool_reward",
+        "monsterized"
+      ],
+      "data": "entry_blueDoor=10_11;entry_guard=205_at_11_11;special_pressure=201_at_11_7;rewards=bomb_at_11_10,blueGem_at_11_8,redPotion_at_11_6;no_exit_bypass=true"
+    },
+    {
+      "stage": "monster",
+      "kind": "combat_chokepoint",
+      "label": "central spine redSlime",
+      "coordinates": [
+        [
+          9,
+          7
+        ]
+      ],
+      "description": "redSlime provides a low-to-medium mandatory main-route combat tax after the first yellow door and before the mid-route potion/key compensation.",
+      "tags": [
+        "main_route",
+        "combat_slot",
+        "route_tax",
+        "no_special"
+      ],
+      "data": "enemy_id=redSlime;tile_code=202;special=0;role=early_balanced_main_route_check;compensation=redPotion_at_9_6,yellowKey_at_8_5"
+    },
+    {
+      "stage": "monster",
+      "kind": "combat_chokepoint",
+      "label": "lower detour redSlime",
+      "coordinates": [
+        [
+          7,
+          8
+        ]
+      ],
+      "description": "redSlime makes the detour route pay a visible combat cost without matching the main spine exactly, since it sits before different branch rewards and the central pocket.",
+      "tags": [
+        "detour_route",
+        "combat_slot",
+        "branch_cost",
+        "no_special"
+      ],
+      "data": "enemy_id=redSlime;tile_code=202;special=0;role=alternate_route_tax;route_relationship=optional_detour_after_3_9_gate"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "central blue-key blackSlime",
+      "coordinates": [
+        [
+          5,
+          6
+        ]
+      ],
+      "description": "blackSlime guards the yellow-door pocket that yields the floor's only blue key and a blue potion, creating an endurance/defense-threshold choice.",
+      "tags": [
+        "reward_guard",
+        "blue_key",
+        "optional_branch",
+        "no_special"
+      ],
+      "data": "enemy_id=blackSlime;tile_code=203;special=0;role=defense_threshold_reward_guard;guard_target=blueKey_at_3_5_and_bluePotion_at_4_5"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "northwest pickaxe bat",
+      "coordinates": [
+        [
+          3,
+          3
+        ]
+      ],
+      "description": "bat guards the actual upper approach into the pickaxe pocket.",
+      "tags": [
+        "reward_guard",
+        "tool_reward",
+        "northwest_detour",
+        "coordinate_adjustment",
+        "no_special"
+      ],
+      "data": "enemy_id=bat;tile_code=205;special=0;role=high_attack_pickaxe_approach_guard;moved_from=1_2;guard_target=pickaxe_at_2_1"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "east branch entry bat",
+      "coordinates": [
+        [
+          11,
+          11
+        ]
+      ],
+      "description": "bat directly follows the lower east blue door, taxing access to the bomb and branch reward line without affecting the main exit route.",
+      "tags": [
+        "reward_guard",
+        "blue_branch",
+        "tool_reward",
+        "no_special"
+      ],
+      "data": "enemy_id=bat;tile_code=205;special=0;role=high_attack_blue_branch_entry_guard;door_cost=blueDoor_at_10_11;guard_target=bomb_at_11_10"
+    },
+    {
+      "stage": "monster",
+      "kind": "special_pressure",
+      "label": "east branch greenSlime",
+      "coordinates": [
+        [
+          11,
+          7
+        ]
+      ],
+      "description": "greenSlime uses the only available whitelisted special in the current pool, special 1, on the optional blue-branch reward line between the blue gem and red potion.",
+      "tags": [
+        "special_pressure",
+        "optional_branch",
+        "blue_branch",
+        "whitelisted_special"
+      ],
+      "data": "enemy_id=greenSlime;tile_code=201;special=1;role=optional_branch_special_chip_pressure;max_specials_per_monster=1;zone_repulse_used=false;affects_route=blue_branch_rewards_between_11_8_and_11_6"
+    },
+    {
+      "stage": "monster",
+      "kind": "mini_boss",
+      "label": "final red-door blackSlime",
+      "coordinates": [
+        [
+          9,
+          1
+        ]
+      ],
+      "description": "blackSlime acts as the late-floor mini-boss precheck after the red key and before the red door, using endurance pressure rather than a special mechanic.",
+      "tags": [
+        "mini_boss",
+        "exit_pressure",
+        "red_gate",
+        "no_special"
+      ],
+      "data": "enemy_id=blackSlime;tile_code=203;special=0;role=mandatory_final_precheck;guard_relationship=after_redKey_at_8_1_before_redDoor_at_10_1"
+    },
+    {
+      "stage": "monster",
+      "kind": "placement_validation",
+      "label": "monster constraints satisfied",
+      "coordinates": [
+        [
+          9,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          9,
+          1
+        ]
+      ],
+      "description": "All enemy tiles use allowed codes, no orthogonally adjacent enemy pairs exist, and only whitelisted special 1 appears.",
+      "tags": [
+        "validation",
+        "allowed_enemies",
+        "no_adjacent_enemies",
+        "special_whitelist"
+      ],
+      "data": "enemy_codes=201,202,203,205;placements=7;orthogonal_adjacency=false;specials_used=1;zone_repulse_used=false;no_special_ratio=6/7"
+    }
+  ]
+}

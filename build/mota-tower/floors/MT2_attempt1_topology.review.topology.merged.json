@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "issues": [],
+  "required_changes": [],
+  "budget_delta": {
+    "yellow_doors": 0,
+    "blue_doors": 0,
+    "red_doors": 0,
+    "yellow_keys": 0,
+    "blue_keys": 0,
+    "red_keys": 0,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 0
+  },
+  "summary": "Local topology review passed. | Topology passes: MT2 is a valid 13x13 floor with correct stairs, legal topology-only tiles, one connected non-wall component, wall ratio 0.556, and three readable route families without uncontrolled open-grid space."
+}

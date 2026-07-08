@@ -1,0 +1,1008 @@
+{
+  "floor_id": "MT0",
+  "floor_index": 0,
+  "floor_size": 13,
+  "summary": "Economy repair for MT0 preserves the 13x13 topology, stair positions, exact tracked quotas, and route structure while sealing the lower approach at [10,2]. The final red door at [10,1] is now reachable only through the intended [9,1] precheck after collecting the red key at [8,1].",
+  "floor": {
+    "floorId": "MT0",
+    "title": "Main Tower 0F",
+    "name": "0",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        47,
+        0,
+        1,
+        0,
+        0,
+        29,
+        23,
+        0,
+        83,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        81,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0,
+        21,
+        27,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        22,
+        32,
+        81,
+        1,
+        0,
+        21,
+        0,
+        1,
+        82,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        31,
+        1,
+        31,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        21,
+        1,
+        28,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        81,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        81,
+        1,
+        49,
+        1
+      ],
+      [
+        1,
+        88,
+        0,
+        21,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        82,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "central-east main route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Primary readable route from the entrance to the exit, priced by the bottom-to-hub yellow door, the upper yellow door, and the final red door.",
+      "tags": [
+        "candidate_routes",
+        "main_route",
+        "entrance_to_exit"
+      ],
+      "data": "length=29;role=primary;doors=9_10,5_2,10_1;red_gate_required=true"
+    },
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "northwest detour route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Long detour remains structurally intact and is protected from the entrance by a west-loop yellow gate plus the central pocket gate.",
+      "tags": [
+        "candidate_routes",
+        "detour_route",
+        "route_commitment"
+      ],
+      "data": "length=41;role=detour;yellow_gates=3_9,5_5;tool_reward=2_1"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "entrance promenade",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ]
+      ],
+      "description": "Entrance free region is controlled: only one starter yellow key is freely exposed, while the main spine and east branch are stopped by visible doors.",
+      "tags": [
+        "regions",
+        "entrance",
+        "staging_space"
+      ],
+      "data": "free_reward=yellowKey_at_3_11;main_gate=9_10;west_loop_gate=3_9;blue_gate=10_11;contains_downFloor_at_1_11"
+    },
+    {
+      "stage": "economy",
+      "kind": "resource_quota",
+      "label": "exact tracked quota placement",
+      "coordinates": [
+        [
+          9,
+          10
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          11,
+          10
+        ]
+      ],
+      "description": "All tracked resources for the floor contract are placed exactly once; the red-door bypass is sealed at [10,2] without changing quotas.",
+      "tags": [
+        "quota",
+        "doors",
+        "keys",
+        "tools",
+        "repair"
+      ],
+      "data": "yellow_doors=4;blue_doors=2;red_doors=1;yellow_keys=4;blue_keys=1;red_keys=1;pickaxes=1;bombs=1;centerFly=0"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "starter yellow gate",
+      "coordinates": [
+        [
+          3,
+          11
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          8
+        ]
+      ],
+      "description": "The first yellow key is the only free entrance reward and pays for the bottom-to-hub yellow door; the next yellow key appears after that commitment.",
+      "tags": [
+        "main_route",
+        "yellow_key_flow",
+        "entrance_control"
+      ],
+      "data": "cost=1_yellow_key;refund_after_gate=1_yellow_key;pre_cost_exposure=tiny"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "west-loop bypass gate",
+      "coordinates": [
+        [
+          3,
+          11
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          3,
+          7
+        ]
+      ],
+      "description": "A yellow door on the west loop prevents the entrance region from reaching the central spine, east branch resources, or tool rewards before any cost is paid.",
+      "tags": [
+        "repair",
+        "entrance_control",
+        "yellow_door",
+        "alternate_route"
+      ],
+      "data": "blocks_free_bypass=true;door=3_9"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "upper yellow gate",
+      "coordinates": [
+        [
+          8,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ]
+      ],
+      "description": "The central spine feeds enough yellow keys to pay the upper approach gate while keeping the exit route solvable after the first commitment.",
+      "tags": [
+        "main_route",
+        "yellow_doors",
+        "progression"
+      ],
+      "data": "door=5_2;keys=8_5,5_3;supports_red_key_access=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "final red gate",
+      "coordinates": [
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "The red key is placed shortly before the final red door, and the sealed [10,2] tile makes the [9,1] precheck mandatory before reaching the upFloor.",
+      "tags": [
+        "main_route",
+        "red_gate",
+        "exit_pressure",
+        "repair"
+      ],
+      "data": "cost=1_red_key;red_key=8_1;precheck=9_1;red_door=10_1;upFloor=11_1;bypass_sealed_at_10_2"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "sealed red-door bypass approach",
+      "coordinates": [
+        [
+          10,
+          2
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "The lower approach to the final red door is sealed at [10,2], so the east branch can no longer bypass the [9,1] final precheck or the red-door route pressure.",
+      "tags": [
+        "repair",
+        "anti_bypass",
+        "red_gate",
+        "blue_door"
+      ],
+      "data": "sealed_tile=10_2;relocated_blueDoor=11_5;red_gate_non_bypassable=true;red_key_reachable_via_8_1"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "optional central blue-key branch",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          4,
+          5
+        ]
+      ],
+      "description": "A yellow-door branch buys access to the only blue key and a modest potion reward, creating a meaningful choice before the blue-door branch.",
+      "tags": [
+        "optional_branch",
+        "yellow_door",
+        "blue_key"
+      ],
+      "data": "cost=1_yellow_key;reward=blueKey_at_3_5,bluePotion_at_4_5;branch_rejoins_upper_detour"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "optional east blue branch",
+      "coordinates": [
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          5
+        ]
+      ],
+      "description": "The east branch is locked from the entrance by a blue door and has a second blue-door option from the upper route; both choices lead to branch rewards without bypassing the red exit gate.",
+      "tags": [
+        "optional_branch",
+        "blue_door",
+        "tool_reward",
+        "repair"
+      ],
+      "data": "entry_blueDoor=10_11;internal_blueDoor=11_5;rewards=bomb_at_11_10,blueGem_at_11_8,redPotion_at_11_6;no_exit_bypass=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "combat_chokepoint",
+      "label": "central spine combat tax",
+      "coordinates": [
+        [
+          9,
+          7
+        ]
+      ],
+      "description": "Place a balanced early combat check on the main spine after the first yellow door and before the mid-route reward cluster.",
+      "tags": [
+        "main_route",
+        "combat_slot",
+        "route_tax"
+      ],
+      "data": "intended_pressure=low_to_medium;compensation=nearby_redPotion_at_9_6_and_yellowKey_at_8_5;avoid_adjacent_enemy_conflicts=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "combat_chokepoint",
+      "label": "lower detour combat tax",
+      "coordinates": [
+        [
+          7,
+          8
+        ]
+      ],
+      "description": "Use the lower detour as an alternate route-tax point so the west loop has a distinct combat/resource profile from the direct central spine.",
+      "tags": [
+        "detour_route",
+        "combat_slot",
+        "branch_cost"
+      ],
+      "data": "intended_pressure=low;route_relationship=optional_detour_after_3_9_gate;avoid_adjacent_enemy_conflicts=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "reward_guard",
+      "label": "central blue-key pocket guard",
+      "coordinates": [
+        [
+          5,
+          6
+        ]
+      ],
+      "description": "Guard the yellow-door pocket that yields the blue key, making the later blue branch an earned route decision rather than a naked key pickup.",
+      "tags": [
+        "reward_guard",
+        "blue_key",
+        "optional_branch"
+      ],
+      "data": "guard_target=blueKey_at_3_5_and_bluePotion_at_4_5;door_cost=yellowDoor_at_5_5"
+    },
+    {
+      "stage": "economy",
+      "kind": "reward_guard",
+      "label": "northwest pickaxe guard",
+      "coordinates": [
+        [
+          3,
+          3
+        ]
+      ],
+      "description": "Add combat pressure on the northwest approach so the pickaxe is protected by route distance, yellow-door commitment, and a visible guard candidate.",
+      "tags": [
+        "reward_guard",
+        "tool_reward",
+        "northwest_detour"
+      ],
+      "data": "guard_target=pickaxe_at_2_1;access_after_mid_route_commitment=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "reward_guard",
+      "label": "east branch tool guard",
+      "coordinates": [
+        [
+          11,
+          11
+        ]
+      ],
+      "description": "The first tile after the lower east blue door is reserved as a guard candidate before the bomb and branch resources.",
+      "tags": [
+        "reward_guard",
+        "blue_branch",
+        "tool_reward"
+      ],
+      "data": "guard_target=bomb_at_11_10,blueGem_at_11_8,redPotion_at_11_6;door_cost=blueDoor_at_10_11"
+    },
+    {
+      "stage": "economy",
+      "kind": "special_candidate",
+      "label": "east branch special pressure",
+      "coordinates": [
+        [
+          11,
+          7
+        ]
+      ],
+      "description": "Use this optional branch slot for a special-pressure candidate if the monster stage needs stronger compensation for the blue-door reward line.",
+      "tags": [
+        "special_candidate",
+        "optional_branch",
+        "blue_branch"
+      ],
+      "data": "preferred_special_role=resource_pressure;compensation=branch_rewards_after_blue_door;avoid_adjacent_enemy_conflicts=true"
+    },
+    {
+      "stage": "economy",
+      "kind": "mini_boss_candidate",
+      "label": "final red-door precheck",
+      "coordinates": [
+        [
+          9,
+          1
+        ]
+      ],
+      "description": "Reserve the empty tile before the red door as a late-floor mini-boss candidate that cannot be bypassed after the [10,2] seal.",
+      "tags": [
+        "mini_boss_candidate",
+        "exit_pressure",
+        "red_gate",
+        "repair"
+      ],
+      "data": "guard_relationship=after_redKey_at_8_1_before_redDoor_at_10_1;mandatory_approach_to_redDoor=true;do_not_place_on_stairs=true"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "limits": {
+    "yellow_doors": null,
+    "blue_doors": null,
+    "red_doors": null,
+    "yellow_keys": null,
+    "blue_keys": null,
+    "red_keys": null,
+    "pickaxes": 3,
+    "bombs": 0,
+    "centerFly": 2
+  },
+  "used": {
+    "yellow_doors": 29,
+    "blue_doors": 9,
+    "red_doors": 1,
+    "yellow_keys": 13,
+    "blue_keys": 7,
+    "red_keys": 1,
+    "pickaxes": 3,
+    "bombs": 0,
+    "centerFly": 2
+  }
+}

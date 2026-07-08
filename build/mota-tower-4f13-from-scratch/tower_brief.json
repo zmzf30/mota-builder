@@ -1,0 +1,92 @@
+{
+  "status": "ready",
+  "summary": "从当前 mota-js 项目和现有素材出发，生成 4 层 13x13 经典数值向魔塔；无新插件、无新素材、无商店。整体强调可计算战斗、钥匙门压力、分支资源选择和稳定可通关路线，不生成楼层地图。",
+  "floor_count": 4,
+  "floor_size": 13,
+  "fixed_rules": [
+    "13x13 floors",
+    "使用当前 mota-js 项目和现有素材，不新增插件或素材",
+    "经典数值向，优先战斗节奏、钥匙门压力、资源选择和可通关性",
+    "仅使用 tile code 0 作为默认可通行地面，tile code 1 作为墙",
+    "不要求外圈整墙，使用墙、门、怪物、机关和道具组织路线",
+    "避免大面积空地、重复墙填充和无代价高价值资源堆",
+    "每层需要结构清晰，并有至少一个有意义分支选择",
+    "不生成楼层地图"
+  ],
+  "global_limits": {
+    "yellow_doors": 20,
+    "blue_doors": 6,
+    "red_doors": 1,
+    "yellow_keys": 17,
+    "blue_keys": 5,
+    "red_keys": 1,
+    "pickaxes": 1,
+    "bombs": 1,
+    "centerFly": 0
+  },
+  "global_settings": {
+    "initial_hero": {
+      "hp": 1000,
+      "atk": 10,
+      "def": 10,
+      "money": 0,
+      "keys": {
+        "yellow": 0,
+        "blue": 0,
+        "red": 0
+      }
+    },
+    "gems": {
+      "redGem": 3,
+      "blueGem": 3,
+      "greenGem": 5
+    },
+    "potions": {
+      "redPotion": 100,
+      "bluePotion": 250,
+      "yellowPotion": 500,
+      "greenPotion": 800
+    },
+    "shop": {
+      "enabled": false,
+      "rule": "",
+      "atk_gain": null,
+      "def_gain": null
+    }
+  },
+  "monster_policy": {
+    "allowed_specials": [
+      1,
+      2,
+      3,
+      15,
+      18
+    ],
+    "max_specials_per_monster": 1,
+    "min_no_special_ratio": 0.5,
+    "monster_types_per_floor": 9,
+    "floor_overlap_ratio": 0.7,
+    "special_damage_red_potion_min": 0.5,
+    "special_damage_red_potion_max": 1,
+    "no_adjacent_enemies": true
+  },
+  "resource_policy": {
+    "gem_floor_delta_min": 0,
+    "gem_floor_delta_max": 2,
+    "potion_floor_delta_min": 0,
+    "potion_floor_delta_max": 2,
+    "potion_compare_mode": "red_potion_equiv"
+  },
+  "layout_policy": [
+    "每层主线必须可通关，分支奖励允许消耗额外钥匙或血量",
+    "黄门承担基础路线压力，蓝门用于中高价值分支或捷径，红门用于终局关键门或大奖励门",
+    "钥匙总量略少于同色门总量，允许玩家通过路线选择跳过部分门",
+    "镐和炸弹作为稀缺路线调整工具，不能成为唯一通关条件",
+    "每层怪物强度随楼层递进，相邻楼层保留约 70% 怪物池重叠并替换较弱怪物",
+    "怪物不得正交相邻，避免形成不可读的连续怪墙",
+    "高价值宝石、药水和钥匙不得裸露堆放，必须绑定战斗、门耗或路线代价",
+    "楼梯路径清晰但不直给，至少经过一次战斗或钥匙门决策"
+  ],
+  "questions": [],
+  "confirmation_prompt": "Confirm this whole-tower brief before floor generation."
+}

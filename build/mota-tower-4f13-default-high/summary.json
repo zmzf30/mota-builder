@@ -1,0 +1,106 @@
+{
+  "status": "complete",
+  "floor_count": 4,
+  "floor_size": 13,
+  "project_dir": "/Users/kanyun/workspace/learn/mota/build/mota-tower-4f13-default-high/project",
+  "budget_ledger": {
+    "limits": {
+      "yellow_doors": null,
+      "blue_doors": null,
+      "red_doors": null,
+      "yellow_keys": null,
+      "blue_keys": null,
+      "red_keys": null,
+      "pickaxes": 3,
+      "bombs": 0,
+      "centerFly": 2
+    },
+    "used": {
+      "yellow_doors": 29,
+      "blue_doors": 9,
+      "red_doors": 1,
+      "yellow_keys": 13,
+      "blue_keys": 7,
+      "red_keys": 1,
+      "pickaxes": 3,
+      "bombs": 0,
+      "centerFly": 2
+    }
+  },
+  "floors": [
+    {
+      "floor_id": "MT0",
+      "floor_size": 13,
+      "summary": "MT0 uses three gated routes from the entrance to the exit: a direct central combat route, a left yellow-door combat/reward route, and a stronger right blue-door route with the pickaxe pocket. Early key refunds and lower-center reward exposure are split into deeper guarded branches while preserving exact MT0 resource quotas.",
+      "budget_delta": {
+        "yellow_doors": 6,
+        "blue_doors": 1,
+        "red_doors": 0,
+        "yellow_keys": 3,
+        "blue_keys": 1,
+        "red_keys": 0,
+        "pickaxes": 1,
+        "bombs": 0,
+        "centerFly": 0
+      },
+      "resumed": true
+    },
+    {
+      "floor_id": "MT1",
+      "floor_size": 13,
+      "summary": "MT1 uses three compact gated routes from the lower entrance: a central combat route, a left blue-door reward pocket, and a stronger upper-right blue-door package with centerFly and pickaxe, while splitting the previous low-cost lower resource cluster into guarded pockets.",
+      "budget_delta": {
+        "yellow_doors": 11,
+        "blue_doors": 3,
+        "red_doors": 0,
+        "yellow_keys": 4,
+        "blue_keys": 2,
+        "red_keys": 0,
+        "pickaxes": 1,
+        "bombs": 0,
+        "centerFly": 1
+      },
+      "resumed": true
+    },
+    {
+      "floor_id": "MT2",
+      "floor_size": 13,
+      "summary": "MT2 is rebuilt as three separated pressured routes: a combat-heavy center line, a yellow-door left route with staged key/resource pockets, and a blue-door right route protecting the pickaxe and stronger rewards. Exact MT2 gem, potion, and tool quotas are preserved with no exposed entrance cluster.",
+      "budget_delta": {
+        "yellow_doors": 8,
+        "blue_doors": 2,
+        "red_doors": 0,
+        "yellow_keys": 3,
+        "blue_keys": 2,
+        "red_keys": 0,
+        "pickaxes": 1,
+        "bombs": 0,
+        "centerFly": 0
+      },
+      "resumed": true
+    },
+    {
+      "floor_id": "MT3",
+      "floor_size": 13,
+      "summary": "MT3 is a compact final floor with a repaired central finish and two pressured side routes: slimelords satisfy no-special density but are paired with blue/yellow doors or stronger chokepoints, while zombieKnight and skeletonCaptain guards break the former easy gem-region links. Exact MT3 gem, potion, key, and centerFly quotas are preserved with the final win event on the up stair.",
+      "budget_delta": {
+        "yellow_doors": 4,
+        "blue_doors": 3,
+        "red_doors": 1,
+        "yellow_keys": 3,
+        "blue_keys": 2,
+        "red_keys": 1,
+        "pickaxes": 0,
+        "bombs": 0,
+        "centerFly": 1
+      },
+      "playtest": {
+        "status": "skipped",
+        "summary": "1055/1056 already served another process; skipped to avoid playtesting the wrong project.",
+        "issues": [
+          "Stop the existing local mota-js server or run without --project-dir to test that server."
+        ]
+      }
+    }
+  ]
+}

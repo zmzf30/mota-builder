@@ -1,0 +1,213 @@
+{
+  "available": true,
+  "width": 13,
+  "height": 13,
+  "wall_ratio": 0.55,
+  "wall_count": 93,
+  "non_wall_cells": 76,
+  "enemy_count": 0,
+  "door_count": 0,
+  "monster_density_non_wall": 0.0,
+  "components_non_wall": 1,
+  "main_component_cells": 76,
+  "main_cycle_rank": 6,
+  "main_cycle_rank_ratio": 0.079,
+  "resource_weight_total": 0.0,
+  "tool_count": 0,
+  "free_region_cells": 76,
+  "free_region_bbox": [
+    [
+      1,
+      1
+    ],
+    [
+      11,
+      11
+    ]
+  ],
+  "free_region_reaches_exit": true,
+  "free_region_resource_count": 0,
+  "free_region_resource_weight": 0.0,
+  "free_region_resources": [],
+  "free_region_tools": [],
+  "free_region_keys": [],
+  "approx_resource_weight_by_access_cost": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+  },
+  "lowest_cost_resources": [],
+  "low_cost_resource_clusters": [],
+  "suggested_relocation_cells": [
+    {
+      "coord": [
+        1,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        2,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        3,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        5,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        6,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        7,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        8,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        9,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        10,
+        1
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        1,
+        2
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        3,
+        2
+      ],
+      "approx_cost": 0.0
+    },
+    {
+      "coord": [
+        5,
+        2
+      ],
+      "approx_cost": 0.0
+    }
+  ],
+  "open_junction_wall_candidates": [
+    {
+      "coord": [
+        10,
+        1
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        10,
+        2
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        11,
+        2
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        5,
+        3
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        10,
+        3
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        11,
+        3
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        9,
+        5
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        7,
+        9
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        9,
+        9
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        9,
+        11
+      ],
+      "degree": 3
+    }
+  ],
+  "enemy_tiles": [],
+  "min_route_to_exit": {
+    "enemy_count": 0,
+    "door_cost": 0.0,
+    "special_red_potion_equiv": 0.0,
+    "total_cost_proxy": 0.0,
+    "steps": 20,
+    "cost_tiles": []
+  },
+  "special_sources": [],
+  "special_affected_cells": 0,
+  "special_can_be_fully_avoided": null,
+  "red_potion_value": 100.0
+}

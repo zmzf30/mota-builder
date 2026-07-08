@@ -1,0 +1,177 @@
+{
+  "contracts": [
+    {
+      "floor_index": 0,
+      "floor_id": "MT0",
+      "floor_size": 13,
+      "floor_count": 4,
+      "role": "entrance",
+      "resource_limits": {
+        "yellow_doors": 4,
+        "blue_doors": 2,
+        "red_doors": 1,
+        "yellow_keys": 4,
+        "blue_keys": 1,
+        "red_keys": 1,
+        "pickaxes": 1,
+        "bombs": 1,
+        "centerFly": 0
+      },
+      "planning_hint": "Parallel floor generation contract. Treat resource_limits as this floor's hard slice of the whole-tower budget. The final merge will connect stairs and verify the whole tower in floor order.",
+      "previous_floor_contract_summaries": []
+    },
+    {
+      "floor_index": 1,
+      "floor_id": "MT1",
+      "floor_size": 13,
+      "floor_count": 4,
+      "role": "middle",
+      "resource_limits": {
+        "yellow_doors": 4,
+        "blue_doors": 1,
+        "red_doors": 0,
+        "yellow_keys": 4,
+        "blue_keys": 1,
+        "red_keys": 0,
+        "pickaxes": 0,
+        "bombs": 0,
+        "centerFly": 0
+      },
+      "planning_hint": "Parallel floor generation contract. Treat resource_limits as this floor's hard slice of the whole-tower budget. The final merge will connect stairs and verify the whole tower in floor order.",
+      "previous_floor_contract_summaries": [
+        {
+          "floor_id": "MT0",
+          "role": "entrance",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 2,
+            "red_doors": 1,
+            "yellow_keys": 4,
+            "blue_keys": 1,
+            "red_keys": 1,
+            "pickaxes": 1,
+            "bombs": 1,
+            "centerFly": 0
+          }
+        }
+      ]
+    },
+    {
+      "floor_index": 2,
+      "floor_id": "MT2",
+      "floor_size": 13,
+      "floor_count": 4,
+      "role": "middle",
+      "resource_limits": {
+        "yellow_doors": 4,
+        "blue_doors": 1,
+        "red_doors": 0,
+        "yellow_keys": 3,
+        "blue_keys": 1,
+        "red_keys": 0,
+        "pickaxes": 0,
+        "bombs": 0,
+        "centerFly": 0
+      },
+      "planning_hint": "Parallel floor generation contract. Treat resource_limits as this floor's hard slice of the whole-tower budget. The final merge will connect stairs and verify the whole tower in floor order.",
+      "previous_floor_contract_summaries": [
+        {
+          "floor_id": "MT0",
+          "role": "entrance",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 2,
+            "red_doors": 1,
+            "yellow_keys": 4,
+            "blue_keys": 1,
+            "red_keys": 1,
+            "pickaxes": 1,
+            "bombs": 1,
+            "centerFly": 0
+          }
+        },
+        {
+          "floor_id": "MT1",
+          "role": "middle",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 1,
+            "red_doors": 0,
+            "yellow_keys": 4,
+            "blue_keys": 1,
+            "red_keys": 0,
+            "pickaxes": 0,
+            "bombs": 0,
+            "centerFly": 0
+          }
+        }
+      ]
+    },
+    {
+      "floor_index": 3,
+      "floor_id": "MT3",
+      "floor_size": 13,
+      "floor_count": 4,
+      "role": "final",
+      "resource_limits": {
+        "yellow_doors": 4,
+        "blue_doors": 1,
+        "red_doors": 0,
+        "yellow_keys": 3,
+        "blue_keys": 1,
+        "red_keys": 0,
+        "pickaxes": 0,
+        "bombs": 0,
+        "centerFly": 0
+      },
+      "planning_hint": "Parallel floor generation contract. Treat resource_limits as this floor's hard slice of the whole-tower budget. The final merge will connect stairs and verify the whole tower in floor order.",
+      "previous_floor_contract_summaries": [
+        {
+          "floor_id": "MT0",
+          "role": "entrance",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 2,
+            "red_doors": 1,
+            "yellow_keys": 4,
+            "blue_keys": 1,
+            "red_keys": 1,
+            "pickaxes": 1,
+            "bombs": 1,
+            "centerFly": 0
+          }
+        },
+        {
+          "floor_id": "MT1",
+          "role": "middle",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 1,
+            "red_doors": 0,
+            "yellow_keys": 4,
+            "blue_keys": 1,
+            "red_keys": 0,
+            "pickaxes": 0,
+            "bombs": 0,
+            "centerFly": 0
+          }
+        },
+        {
+          "floor_id": "MT2",
+          "role": "middle",
+          "resource_limits": {
+            "yellow_doors": 4,
+            "blue_doors": 1,
+            "red_doors": 0,
+            "yellow_keys": 3,
+            "blue_keys": 1,
+            "red_keys": 0,
+            "pickaxes": 0,
+            "bombs": 0,
+            "centerFly": 0
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "status": "fail",
+  "issues": [
+    "Large direct resource region [10,1]->[11,3] has resource_weight=6.0, resources=4, gems=2: redGem@[11,1], redPotion@[11,2], blueGem@[10,3], pickaxe@[11,3]."
+  ],
+  "required_changes": [
+    "Rebuild direct resource region [10,1]->[11,3]: split the resources into staged sub-regions and add pressure on the easiest internal route before the richest rewards."
+  ],
+  "budget_delta": {
+    "yellow_doors": 0,
+    "blue_doors": 0,
+    "red_doors": 0,
+    "yellow_keys": 0,
+    "blue_keys": 0,
+    "red_keys": 0,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 0
+  },
+  "summary": "Gem route balance reviewer found 1 route/resource imbalance issue(s)."
+}

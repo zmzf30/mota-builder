@@ -1,0 +1,671 @@
+{
+  "available": true,
+  "width": 13,
+  "height": 13,
+  "wall_ratio": 0.627,
+  "wall_count": 106,
+  "non_wall_cells": 63,
+  "enemy_count": 20,
+  "door_count": 8,
+  "monster_density_non_wall": 0.317,
+  "components_non_wall": 1,
+  "main_component_cells": 63,
+  "main_cycle_rank": 7,
+  "main_cycle_rank_ratio": 0.111,
+  "resource_weight_total": 37.0,
+  "tool_count": 1,
+  "free_region_cells": 1,
+  "free_region_bbox": [
+    [
+      6,
+      12
+    ],
+    [
+      6,
+      12
+    ]
+  ],
+  "free_region_reaches_exit": false,
+  "free_region_resource_count": 0,
+  "free_region_resource_weight": 0.0,
+  "free_region_resources": [],
+  "free_region_tools": [],
+  "free_region_keys": [],
+  "approx_resource_weight_by_access_cost": {
+    "0": 0.0,
+    "1": 1.0,
+    "2": 4.0,
+    "3": 32.0
+  },
+  "lowest_cost_resources": [
+    {
+      "id": "yellowKey",
+      "coord": [
+        5,
+        10
+      ],
+      "approx_cost": 1.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        3,
+        10
+      ],
+      "approx_cost": 2.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueKey",
+      "coord": [
+        8,
+        10
+      ],
+      "approx_cost": 2.0,
+      "weight": 2.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        8,
+        11
+      ],
+      "approx_cost": 2.0,
+      "weight": 1.0
+    },
+    {
+      "id": "bluePotion",
+      "coord": [
+        2,
+        8
+      ],
+      "approx_cost": 3.0,
+      "weight": 2.5
+    },
+    {
+      "id": "blueKey",
+      "coord": [
+        3,
+        8
+      ],
+      "approx_cost": 3.0,
+      "weight": 2.0
+    },
+    {
+      "id": "redGem",
+      "coord": [
+        1,
+        10
+      ],
+      "approx_cost": 3.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        1,
+        11
+      ],
+      "approx_cost": 3.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redGem",
+      "coord": [
+        5,
+        8
+      ],
+      "approx_cost": 4.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        7,
+        8
+      ],
+      "approx_cost": 4.0,
+      "weight": 1.0
+    },
+    {
+      "id": "centerFly",
+      "coord": [
+        6,
+        6
+      ],
+      "approx_cost": 5.0,
+      "weight": 0.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        9,
+        8
+      ],
+      "approx_cost": 5.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        11,
+        10
+      ],
+      "approx_cost": 5.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        10,
+        11
+      ],
+      "approx_cost": 5.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        11,
+        11
+      ],
+      "approx_cost": 5.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redKey",
+      "coord": [
+        6,
+        4
+      ],
+      "approx_cost": 6.0,
+      "weight": 4.0
+    },
+    {
+      "id": "redGem",
+      "coord": [
+        8,
+        4
+      ],
+      "approx_cost": 6.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        1,
+        5
+      ],
+      "approx_cost": 6.0,
+      "weight": 1.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        2,
+        6
+      ],
+      "approx_cost": 6.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redGem",
+      "coord": [
+        3,
+        6
+      ],
+      "approx_cost": 6.0,
+      "weight": 1.0
+    }
+  ],
+  "low_cost_resource_clusters": [
+    {
+      "threshold_cost": 1.0,
+      "bbox": [
+        [
+          5,
+          10
+        ],
+        [
+          6,
+          12
+        ]
+      ],
+      "cells": 4,
+      "resource_weight": 1.0,
+      "resources": [
+        {
+          "id": "yellowKey",
+          "coord": [
+            5,
+            10
+          ],
+          "weight": 1.0
+        }
+      ],
+      "tools": []
+    },
+    {
+      "threshold_cost": 2.0,
+      "bbox": [
+        [
+          3,
+          9
+        ],
+        [
+          8,
+          12
+        ]
+      ],
+      "cells": 10,
+      "resource_weight": 5.0,
+      "resources": [
+        {
+          "id": "redPotion",
+          "coord": [
+            3,
+            10
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            5,
+            10
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "blueKey",
+          "coord": [
+            8,
+            10
+          ],
+          "weight": 2.0
+        },
+        {
+          "id": "redPotion",
+          "coord": [
+            8,
+            11
+          ],
+          "weight": 1.0
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "suggested_relocation_cells": [
+    {
+      "coord": [
+        8,
+        5
+      ],
+      "approx_cost": 6.0
+    },
+    {
+      "coord": [
+        1,
+        6
+      ],
+      "approx_cost": 6.0
+    }
+  ],
+  "open_junction_wall_candidates": [
+    {
+      "coord": [
+        6,
+        10
+      ],
+      "degree": 4
+    },
+    {
+      "coord": [
+        1,
+        6
+      ],
+      "degree": 3
+    }
+  ],
+  "enemy_tiles": [
+    {
+      "id": "zombieKnight",
+      "code": 214,
+      "coord": [
+        6,
+        3
+      ],
+      "hp": 150,
+      "atk": 34,
+      "def": 18,
+      "special": [
+        3
+      ]
+    },
+    {
+      "id": "skeletonCaptain",
+      "code": 211,
+      "coord": [
+        1,
+        4
+      ],
+      "hp": 78,
+      "atk": 38,
+      "def": 7,
+      "special": [
+        1
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        5,
+        4
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "skeletonCaptain",
+      "code": 211,
+      "coord": [
+        7,
+        4
+      ],
+      "hp": 78,
+      "atk": 38,
+      "def": 7,
+      "special": [
+        1
+      ]
+    },
+    {
+      "id": "zombieKnight",
+      "code": 214,
+      "coord": [
+        9,
+        4
+      ],
+      "hp": 150,
+      "atk": 34,
+      "def": 18,
+      "special": [
+        3
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        4,
+        5
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        6,
+        5
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        5,
+        6
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        7,
+        6
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "zombieKnight",
+      "code": 214,
+      "coord": [
+        9,
+        6
+      ],
+      "hp": 150,
+      "atk": 34,
+      "def": 18,
+      "special": [
+        3
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        1,
+        7
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "redPriest",
+      "code": 218,
+      "coord": [
+        6,
+        7
+      ],
+      "hp": 70,
+      "atk": 28,
+      "def": 5,
+      "special": [
+        2
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        11,
+        7
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "zombieKnight",
+      "code": 214,
+      "coord": [
+        10,
+        8
+      ],
+      "hp": 150,
+      "atk": 34,
+      "def": 18,
+      "special": [
+        3
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        3,
+        9
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "skeletonCaptain",
+      "code": 211,
+      "coord": [
+        6,
+        9
+      ],
+      "hp": 78,
+      "atk": 38,
+      "def": 7,
+      "special": [
+        1
+      ]
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        9,
+        9
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "slimelord",
+      "code": 204,
+      "coord": [
+        7,
+        10
+      ],
+      "hp": 85,
+      "atk": 30,
+      "def": 6,
+      "special": []
+    },
+    {
+      "id": "zombieKnight",
+      "code": 214,
+      "coord": [
+        10,
+        10
+      ],
+      "hp": 150,
+      "atk": 34,
+      "def": 18,
+      "special": [
+        3
+      ]
+    },
+    {
+      "id": "skeletonCaptain",
+      "code": 211,
+      "coord": [
+        6,
+        11
+      ],
+      "hp": 78,
+      "atk": 38,
+      "def": 7,
+      "special": [
+        1
+      ]
+    }
+  ],
+  "min_route_to_exit": {
+    "enemy_count": 5,
+    "door_cost": 6.0,
+    "special_red_potion_equiv": 0.0,
+    "total_cost_proxy": 11.0,
+    "steps": 11,
+    "cost_tiles": [
+      {
+        "id": "skeletonCaptain",
+        "coord": [
+          6,
+          11
+        ],
+        "code": 211
+      },
+      {
+        "id": "skeletonCaptain",
+        "coord": [
+          6,
+          9
+        ],
+        "code": 211
+      },
+      {
+        "id": "blueDoor",
+        "coord": [
+          6,
+          8
+        ],
+        "code": 82
+      },
+      {
+        "id": "redPriest",
+        "coord": [
+          6,
+          7
+        ],
+        "code": 218
+      },
+      {
+        "id": "slimelord",
+        "coord": [
+          6,
+          5
+        ],
+        "code": 204
+      },
+      {
+        "id": "redKey",
+        "coord": [
+          6,
+          4
+        ],
+        "code": 23
+      },
+      {
+        "id": "zombieKnight",
+        "coord": [
+          6,
+          3
+        ],
+        "code": 214
+      },
+      {
+        "id": "redDoor",
+        "coord": [
+          6,
+          2
+        ],
+        "code": 83
+      }
+    ]
+  },
+  "special_sources": [],
+  "special_affected_cells": 0,
+  "special_can_be_fully_avoided": null,
+  "red_potion_value": 80.0
+}

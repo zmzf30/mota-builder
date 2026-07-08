@@ -1,0 +1,4 @@
+interface:
+  display_name: "试玩魔塔游戏"
+  short_description: "Playtest a generated mota game in browser"
+  default_prompt: "Use $playtest-mota-game to open the local mota-js game, skip intro text, explore routes with keyboard controls, and report route balance issues."

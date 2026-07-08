@@ -1,0 +1,1425 @@
+{
+  "floor_id": "MT2",
+  "floor_index": 2,
+  "floor_size": 13,
+  "summary": "Structural topology only for MT2: 13x13 shell with one downFloor, one upFloor, 94 walls, 75 passable cells, three entrance-to-exit candidate routes, controlled junctions, and branch spaces reserved for later economy and monster stages.",
+  "floor": {
+    "floorId": "MT2",
+    "title": "Main Tower 2F",
+    "name": "2",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        88,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "east_spine_route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          9
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          9,
+          4
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          10,
+          3
+        ],
+        [
+          11,
+          3
+        ],
+        [
+          11,
+          2
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Shortest readable route using the lower gallery and eastern vertical climb before bending into the upper exit lane.",
+      "tags": [
+        "candidate_routes",
+        "main_route",
+        "east"
+      ],
+      "data": "{\"route_id\":\"east_spine\",\"length\":25}"
+    },
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "central_climb_route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Middle route through the lower split, central shaft, and upper approach; useful for later medium-cost gating.",
+      "tags": [
+        "candidate_routes",
+        "middle_route",
+        "central"
+      ],
+      "data": "{\"route_id\":\"central_climb\",\"length\":25}"
+    },
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "west_switchback_route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Longer western route with multiple turns and reward pockets, suitable for optional combat or key pressure.",
+      "tags": [
+        "candidate_routes",
+        "side_route",
+        "west"
+      ],
+      "data": "{\"route_id\":\"west_switchback\",\"length\":37}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "arrival_split",
+      "coordinates": [
+        [
+          5,
+          11
+        ]
+      ],
+      "description": "Lower gallery split where later stages can direct the player toward western or central progression.",
+      "tags": [
+        "junctions",
+        "lower"
+      ],
+      "data": "{\"degree\":\"3_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "lower_route_fork",
+      "coordinates": [
+        [
+          7,
+          11
+        ]
+      ],
+      "description": "Second lower split that separates central climb access from the eastern spine.",
+      "tags": [
+        "junctions",
+        "lower"
+      ],
+      "data": "{\"degree\":\"3_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "central_cross",
+      "coordinates": [
+        [
+          7,
+          7
+        ]
+      ],
+      "description": "Central crossroad connecting the central shaft, eastward passage, and upper chamber approach.",
+      "tags": [
+        "junctions",
+        "central"
+      ],
+      "data": "{\"degree\":\"4_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "upper_central_turn",
+      "coordinates": [
+        [
+          5,
+          5
+        ]
+      ],
+      "description": "Upper central turn that can become a combat check or door-controlled branch point.",
+      "tags": [
+        "junctions",
+        "central"
+      ],
+      "data": "{\"degree\":\"3_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "east_upper_turn",
+      "coordinates": [
+        [
+          9,
+          5
+        ]
+      ],
+      "description": "Eastern bend before the final upper approach, useful for route commitment pressure.",
+      "tags": [
+        "junctions",
+        "east"
+      ],
+      "data": "{\"degree\":\"3_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "junction",
+      "label": "exit_lane_merge",
+      "coordinates": [
+        [
+          7,
+          1
+        ]
+      ],
+      "description": "Merge point where central and western routes enter the upper lane toward the exit.",
+      "tags": [
+        "junctions",
+        "upper"
+      ],
+      "data": "{\"degree\":\"3_way\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "arrival_gallery",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          11,
+          10
+        ]
+      ],
+      "description": "Broad lower arrival band with three exits reserved for later route pressure.",
+      "tags": [
+        "regions",
+        "lower"
+      ],
+      "data": "{\"role\":\"entrance_distribution\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "west_switchback_region",
+      "coordinates": [
+        [
+          1,
+          9
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          5
+        ]
+      ],
+      "description": "Long side region that can hold optional rewards behind cost or combat.",
+      "tags": [
+        "regions",
+        "west",
+        "branch"
+      ],
+      "data": "{\"role\":\"optional_branch\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "central_chamber_region",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          7
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ]
+      ],
+      "description": "Middle chamber cluster connecting the main split to upper routes.",
+      "tags": [
+        "regions",
+        "central"
+      ],
+      "data": "{\"role\":\"route_hub\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "east_climb_region",
+      "coordinates": [
+        [
+          9,
+          5
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          9
+        ],
+        [
+          10,
+          9
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          9,
+          7
+        ]
+      ],
+      "description": "Eastern climb with several one-tile chokepoints for later visible progression checks.",
+      "tags": [
+        "regions",
+        "east"
+      ],
+      "data": "{\"role\":\"main_pressure_lane\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "region",
+      "label": "upper_approach_region",
+      "coordinates": [
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ],
+        [
+          11,
+          2
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          10,
+          3
+        ],
+        [
+          11,
+          3
+        ],
+        [
+          9,
+          4
+        ]
+      ],
+      "description": "Final approach region near the exit, shaped to support a late local gate without blocking stair clarity.",
+      "tags": [
+        "regions",
+        "upper",
+        "exit"
+      ],
+      "data": "{\"role\":\"exit_approach\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "reward_room_candidate",
+      "label": "lower_west_reward_pocket",
+      "coordinates": [
+        [
+          1,
+          9
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          5,
+          10
+        ]
+      ],
+      "description": "Side pocket branching from the lower gallery, suitable for a keyed or combat-guarded reward.",
+      "tags": [
+        "reward_room_candidates",
+        "west",
+        "lower"
+      ],
+      "data": "{\"priority\":\"high\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "reward_room_candidate",
+      "label": "middle_left_reward_pocket",
+      "coordinates": [
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          7
+        ]
+      ],
+      "description": "Compact side space along the western route for a small reward cluster.",
+      "tags": [
+        "reward_room_candidates",
+        "west"
+      ],
+      "data": "{\"priority\":\"medium\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "reward_room_candidate",
+      "label": "central_reward_chamber",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          7
+        ]
+      ],
+      "description": "Central chamber can host a moderate reward balanced by route commitment.",
+      "tags": [
+        "reward_room_candidates",
+        "central"
+      ],
+      "data": "{\"priority\":\"high\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "reward_room_candidate",
+      "label": "east_reward_pocket",
+      "coordinates": [
+        [
+          9,
+          5
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          7
+        ]
+      ],
+      "description": "Eastern pocket near the climb, suitable for a visible reward behind a door or enemy later.",
+      "tags": [
+        "reward_room_candidates",
+        "east"
+      ],
+      "data": "{\"priority\":\"medium\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "reward_room_candidate",
+      "label": "upper_west_reward_pocket",
+      "coordinates": [
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          1
+        ]
+      ],
+      "description": "Upper-left pocket reachable from the western switchback, good for a delayed optional reward.",
+      "tags": [
+        "reward_room_candidates",
+        "upper",
+        "west"
+      ],
+      "data": "{\"priority\":\"medium\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "lower_west_gate",
+      "coordinates": [
+        [
+          5,
+          10
+        ]
+      ],
+      "description": "Candidate gate controlling access from the lower gallery into the west switchback route.",
+      "tags": [
+        "door_candidates",
+        "yellow_candidate",
+        "branch_control"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "central_lift_gate",
+      "coordinates": [
+        [
+          7,
+          10
+        ]
+      ],
+      "description": "Candidate gate for the central climb, creating a choice against the eastern route.",
+      "tags": [
+        "door_candidates",
+        "yellow_candidate",
+        "route_control"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "east_entry_gate",
+      "coordinates": [
+        [
+          11,
+          10
+        ]
+      ],
+      "description": "Candidate gate at the start of the eastern spine to price the shortest route.",
+      "tags": [
+        "door_candidates",
+        "yellow_candidate",
+        "main_route"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "west_branch_gate",
+      "coordinates": [
+        [
+          3,
+          7
+        ]
+      ],
+      "description": "Candidate gate for the western side branch before it rejoins upper progression.",
+      "tags": [
+        "door_candidates",
+        "blue_candidate",
+        "branch_control"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "central_chamber_gate",
+      "coordinates": [
+        [
+          5,
+          5
+        ]
+      ],
+      "description": "Candidate gate separating the central chamber from the upper-center approach.",
+      "tags": [
+        "door_candidates",
+        "yellow_candidate",
+        "hub_control"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "east_upper_gate",
+      "coordinates": [
+        [
+          9,
+          5
+        ]
+      ],
+      "description": "Candidate gate where the eastern climb bends toward the upper exit lane.",
+      "tags": [
+        "door_candidates",
+        "yellow_candidate",
+        "route_control"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "door_candidate",
+      "label": "final_exit_lane_gate",
+      "coordinates": [
+        [
+          11,
+          2
+        ]
+      ],
+      "description": "Candidate final local gate immediately before the upFloor, preserving stair visibility.",
+      "tags": [
+        "door_candidates",
+        "late_gate",
+        "exit"
+      ],
+      "data": "{\"suggested_stage\":\"economy\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "special_pressure_candidate",
+      "label": "east_spine_pressure",
+      "coordinates": [
+        [
+          11,
+          8
+        ]
+      ],
+      "description": "Chokepoint on the eastern spine where a later special enemy can tax the shortest route.",
+      "tags": [
+        "special_pressure_candidates",
+        "east",
+        "main_route"
+      ],
+      "data": "{\"spacing_note\":\"single_slot\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "special_pressure_candidate",
+      "label": "central_lift_pressure",
+      "coordinates": [
+        [
+          7,
+          8
+        ]
+      ],
+      "description": "Central shaft pressure slot with enough separation from other candidate combat positions.",
+      "tags": [
+        "special_pressure_candidates",
+        "central"
+      ],
+      "data": "{\"spacing_note\":\"avoid_adjacent_enemy_slots\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "special_pressure_candidate",
+      "label": "west_turn_pressure",
+      "coordinates": [
+        [
+          3,
+          6
+        ]
+      ],
+      "description": "Western switchback slot that can make the longer route carry a meaningful cost.",
+      "tags": [
+        "special_pressure_candidates",
+        "west",
+        "branch"
+      ],
+      "data": "{\"spacing_note\":\"single_slot\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "special_pressure_candidate",
+      "label": "upper_connector_pressure",
+      "coordinates": [
+        [
+          5,
+          3
+        ]
+      ],
+      "description": "Upper connector slot before western and central routes merge into the exit approach.",
+      "tags": [
+        "special_pressure_candidates",
+        "upper"
+      ],
+      "data": "{\"spacing_note\":\"single_slot\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "special_pressure_candidate",
+      "label": "final_bend_pressure",
+      "coordinates": [
+        [
+          9,
+          4
+        ]
+      ],
+      "description": "Pressure slot at the eastern upper bend before the final approach to the upFloor.",
+      "tags": [
+        "special_pressure_candidates",
+        "east",
+        "upper"
+      ],
+      "data": "{\"spacing_note\":\"single_slot\"}"
+    }
+  ]
+}

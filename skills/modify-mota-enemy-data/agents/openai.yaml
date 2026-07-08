@@ -1,0 +1,4 @@
+interface:
+  display_name: "修改魔塔怪物数据"
+  short_description: "Set existing mota-js enemy stats"
+  default_prompt: "Use $modify-mota-enemy-data to set existing mota-js enemy stats."

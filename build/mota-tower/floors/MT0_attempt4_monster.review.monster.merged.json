@@ -1,0 +1,48 @@
+{
+  "status": "fail",
+  "issues": [
+    {
+      "owner_stage": "monster",
+      "severity": "fail",
+      "coordinates": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "reason": "The bat at [1,2] is annotated as the northwest pickaxe guard, but the pickaxe at [2,1] can be reached from the upper approach through [3,3] -> [3,2] -> [3,1] without fighting this bat. As placed, the monster functions as lower detour pressure, not a concrete reward guard for the tool.",
+      "required_change": "Move the northwest pickaxe guard onto the actual upper approach, preferably [3,3], or otherwise make [1,2] the only practical approach to [2,1] without changing resource quotas."
+    }
+  ],
+  "required_changes": [
+    "Move the northwest pickaxe guard onto the actual upper approach, preferably [3,3], or otherwise make [1,2] the only practical approach to [2,1] without changing resource quotas."
+  ],
+  "budget_delta": {
+    "yellow_doors": 4,
+    "blue_doors": 2,
+    "red_doors": 1,
+    "yellow_keys": 4,
+    "blue_keys": 1,
+    "red_keys": 1,
+    "pickaxes": 1,
+    "bombs": 1,
+    "centerFly": 0
+  },
+  "summary": "Local monster review passed. | Enemy ids and codes are allowed, special use is whitelisted, max-special limits are respected, and no enemy tiles are orthogonally adjacent. The only blocking monster-placement issue is that the northwest bat does not actually guard its claimed pickaxe reward."
+}

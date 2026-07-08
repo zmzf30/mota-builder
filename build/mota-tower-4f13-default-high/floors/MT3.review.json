@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "issues": [
+    "[gem route balance] Gem regions [1,2]->[1,3] and [1,5]->[3,6] are connected by an unusually easy route: score=1.2, hp_loss=65.0, key_cost=0.0, enemies=1, doors=0, steps=2; path [1,3]->[1,4]->[1,5].",
+    "[gem route balance] Gem regions [4,4]->[4,4] and [1,5]->[3,6] are connected by an unusually easy route: score=1.81, hp_loss=20.0, key_cost=1.0, enemies=1, doors=1, steps=3; path [4,4]->[4,5]->[4,6]->[3,6].",
+    "[gem route balance] Gem regions [4,4]->[4,4] and [8,4]->[8,6] are connected by an unusually easy route: score=1.84, hp_loss=85.0, key_cost=0.0, enemies=2, doors=0, steps=4; path [4,4]->[5,4]->[6,4]->[7,4]->[8,4].",
+    "[gem route balance] Gem regions [5,8]->[5,8] and [7,8]->[7,8] are connected by an unusually easy route: score=2.19, hp_loss=0.0, key_cost=2.0, enemies=0, doors=1, steps=2; path [5,8]->[6,8]->[7,8]."
+  ],
+  "required_changes": [
+    "[gem route balance] Rebuild the connection between gem regions [1,2]->[1,3] and [1,5]->[3,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "[gem route balance] Rebuild the connection between gem regions [4,4]->[4,4] and [1,5]->[3,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "[gem route balance] Rebuild the connection between gem regions [4,4]->[4,4] and [8,4]->[8,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "[gem route balance] Rebuild the connection between gem regions [5,8]->[5,8] and [7,8]->[7,8]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices."
+  ],
+  "budget_delta": {
+    "yellow_doors": 4,
+    "blue_doors": 3,
+    "red_doors": 1,
+    "yellow_keys": 3,
+    "blue_keys": 2,
+    "red_keys": 1,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 1
+  },
+  "summary": "current: MT3 passes: valid 13x13 map, exact MT3 resource progression, remaining whole-tower tool budget respected, enemy policy and adjacency checks pass, and the map offers viable central/left/right pressured route choices with protected rewards. | connectivity density: Connectivity and density pass: wall_ratio 0.627 and monster_density_non_wall 0.317 create compact high-pressure routing, main_cycle_rank_ratio 0.111 avoids open-grid sprawl, and the exit route has sufficient enemy and door pressure while side branches remain controlled. | resource balance: Resource balance passes: the entrance/free region exposes no resources or tools, low-cost starter rewards are small and staged behind combat, blue doors unlock stronger route or finish access, and the centerFly is protected behind central blue-door combat pressure. | monster damage: Monster pacing is acceptable: the mandatory route uses varied pressure at [6,11], [6,9], [6,7], [6,5], and [6,3], while side-branch enemies protect real rewards. No zone or repulse monsters are placed, so there is no decorative special-damage issue in scope. | gem route balance: Gem route balance reviewer found 4 route/resource imbalance issue(s)."
+}

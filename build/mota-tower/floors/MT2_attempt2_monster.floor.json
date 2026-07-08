@@ -1,0 +1,465 @@
+{
+  "floor_id": "MT2",
+  "floor_index": 2,
+  "floor_size": 13,
+  "summary": "MT2 monster pass preserved the repaired economy and topology, then filled five concrete combat slots with allowed enemy codes only: skeletons for light route tolls, a zombie for central endurance pressure, a bigBat for higher post-blue-branch attack pressure, and a brownWizard repulse guard on the upper connector. No redPriest was used because its current two-special profile would violate max_specials_per_monster. Enemy tiles are not orthogonally adjacent, tracked door/key quotas and stairs are unchanged.",
+  "floor": {
+    "floorId": "MT2",
+    "title": "Main Tower 2F",
+    "name": "2",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        32,
+        0,
+        27,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0,
+        81,
+        219,
+        0,
+        1,
+        0,
+        32,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        34,
+        0,
+        21,
+        1,
+        0,
+        32,
+        0,
+        1,
+        0,
+        21,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        206,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        209,
+        82,
+        1,
+        29,
+        0,
+        0,
+        27,
+        0,
+        1,
+        28,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        213,
+        1,
+        0,
+        1,
+        209,
+        1
+      ],
+      [
+        1,
+        0,
+        22,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        81,
+        1,
+        81,
+        1,
+        1,
+        1,
+        81,
+        1
+      ],
+      [
+        1,
+        88,
+        0,
+        21,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "topology",
+      "kind": "preserved_route_set",
+      "label": "three_route_structure_preserved",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "The east spine, central climb, and west switchback topology from the economy output is unchanged; only combat placeholder ground tiles were replaced by enemies.",
+      "tags": [
+        "topology",
+        "preserved",
+        "routes"
+      ],
+      "data": "{\"routes\":[\"east_spine\",\"central_climb\",\"west_switchback\"],\"stairs_preserved\":{\"down\":[1,11],\"up\":[11,1]}}"
+    },
+    {
+      "stage": "economy",
+      "kind": "quota_preserved",
+      "label": "tracked_door_key_quota_preserved",
+      "coordinates": [
+        [
+          5,
+          10
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          2,
+          9
+        ]
+      ],
+      "description": "All tracked doors and keys from the repaired economy output remain at their repaired coordinates.",
+      "tags": [
+        "economy",
+        "preserved",
+        "doors",
+        "keys"
+      ],
+      "data": "{\"yellow_doors\":4,\"blue_doors\":1,\"yellow_keys\":3,\"blue_keys\":1,\"red_doors\":0,\"red_keys\":0,\"tools\":0}"
+    },
+    {
+      "stage": "monster",
+      "kind": "enemy_assignment",
+      "label": "central_lift_zombie_tax",
+      "coordinates": [
+        [
+          7,
+          8
+        ]
+      ],
+      "description": "A zombie creates a moderate endurance and defense-threshold check on the central climb after the lower yellow door without adding special pressure to a route that no longer refunds a yellow key.",
+      "tags": [
+        "central",
+        "main_route",
+        "endurance",
+        "no_special"
+      ],
+      "data": "{\"enemy_id\":\"zombie\",\"enemy_code\":213,\"stats\":{\"hp\":90,\"atk\":25,\"def\":9,\"money\":4,\"special\":0},\"replaces\":\"central_lift_tax\",\"role\":\"moderate_central_tax\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "enemy_assignment",
+      "label": "east_spine_skeleton_tax",
+      "coordinates": [
+        [
+          11,
+          8
+        ]
+      ],
+      "description": "A skeleton keeps the repaired east spine as a light-to-medium alternative route after its second yellow-door cost was removed.",
+      "tags": [
+        "east",
+        "main_route",
+        "light_medium",
+        "no_special"
+      ],
+      "data": "{\"enemy_id\":\"skeleton\",\"enemy_code\":209,\"stats\":{\"hp\":65,\"atk\":28,\"def\":5,\"money\":4,\"special\":0},\"replaces\":\"east_spine_tax_reduced\",\"role\":\"short_route_toll\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "enemy_assignment",
+      "label": "west_blue_key_skeleton_guard",
+      "coordinates": [
+        [
+          2,
+          7
+        ]
+      ],
+      "description": "A skeleton sits before the west blue door to make the blue-key branch cost health before converting into deeper rewards.",
+      "tags": [
+        "west",
+        "branch",
+        "blue_key",
+        "no_special"
+      ],
+      "data": "{\"enemy_id\":\"skeleton\",\"enemy_code\":209,\"stats\":{\"hp\":65,\"atk\":28,\"def\":5,\"money\":4,\"special\":0},\"replaces\":\"west_blue_key_guard\",\"role\":\"pre_blue_branch_check\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "enemy_assignment",
+      "label": "west_blue_branch_bigbat_guard",
+      "coordinates": [
+        [
+          3,
+          6
+        ]
+      ],
+      "description": "A bigBat immediately after the blue door raises attack pressure on the richer west reward branch while remaining diagonally, not orthogonally, separated from the pre-door skeleton.",
+      "tags": [
+        "west",
+        "blue_branch",
+        "reward_guard",
+        "special_1"
+      ],
+      "data": "{\"enemy_id\":\"bigBat\",\"enemy_code\":206,\"stats\":{\"hp\":70,\"atk\":36,\"def\":6,\"money\":6,\"special\":[1]},\"replaces\":\"west_blue_branch_guard\",\"role\":\"post_blue_reward_guard\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "enemy_assignment",
+      "label": "upper_connector_brownwizard_repulse",
+      "coordinates": [
+        [
+          6,
+          3
+        ]
+      ],
+      "description": "A brownWizard turns the repaired upper connector into a real optional repulse pressure point affecting the west-to-exit shortcut and central access into upper-west rewards.",
+      "tags": [
+        "upper",
+        "west",
+        "connector",
+        "repulse",
+        "special_18"
+      ],
+      "data": "{\"enemy_id\":\"brownWizard\",\"enemy_code\":219,\"stats\":{\"hp\":80,\"atk\":32,\"def\":6,\"money\":6,\"special\":[18]},\"replaces\":\"upper_connector_mini_boss_repaired\",\"role\":\"optional_repulse_connector_guard\",\"policy_target_red_potion_equiv\":[0.5,1.0],\"affects\":[\"upper_connector_shortcut\",\"west_reward_exit_merge\"]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "constraint_check",
+      "label": "enemy_special_and_adjacency_check",
+      "coordinates": [
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          11,
+          8
+        ]
+      ],
+      "description": "All enemy codes are from the current floor allowed list, no enemy is orthogonally adjacent to another enemy, and every used special is whitelisted with at most one special per monster.",
+      "tags": [
+        "validation",
+        "allowed_enemies",
+        "no_orthogonal_adjacency",
+        "special_whitelist"
+      ],
+      "data": "{\"allowed_enemy_codes_used\":[219,206,209,213],\"unused_allowed_enemy_codes\":[218],\"unused_reason\":{\"218\":\"redPriest current profile has two specials [2,15], exceeding max_specials_per_monster\"},\"used_specials\":[18,1],\"no_special_enemy_count\":3,\"enemy_count\":5,\"no_special_ratio\":0.6,\"orthogonal_enemy_adjacency\":false}"
+    }
+  ]
+}

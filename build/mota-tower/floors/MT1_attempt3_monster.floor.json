@@ -1,0 +1,446 @@
+{
+  "floor_id": "MT1",
+  "floor_index": 1,
+  "floor_size": 13,
+  "summary": "MT1 monster repair keeps the current economy map and all tracked resource quotas unchanged. The invalid special 15 and 18 claims were removed because the allowed concrete enemy tile codes on this floor all have current stats special=0 and the stage rules forbid inventing special data, scripts, events, or custom enemies. The floor now has 10 allowed no-special enemies with distinct ordinary roles across the west-loop main route, west reward branch, central blue-door reward route, and east exit spine, with zero orthogonal enemy adjacency.",
+  "floor": {
+    "floorId": "MT1",
+    "title": "主塔 1 层",
+    "name": "1",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        31,
+        21,
+        27,
+        1,
+        0,
+        0,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0,
+        209,
+        1,
+        0,
+        0,
+        203,
+        1,
+        213,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        82,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        202,
+        28,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        31,
+        1,
+        1,
+        1,
+        81,
+        1
+      ],
+      [
+        1,
+        22,
+        81,
+        0,
+        0,
+        205,
+        1,
+        203,
+        34,
+        205,
+        1,
+        209,
+        1
+      ],
+      [
+        1,
+        209,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        21,
+        1
+      ],
+      [
+        1,
+        21,
+        1,
+        202,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        81,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        88,
+        21,
+        0,
+        1,
+        32,
+        29,
+        81,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "tracked_resource_quota_accounting_preserved",
+      "coordinates": [
+        [
+          3,
+          10
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          1,
+          7
+        ]
+      ],
+      "description": "Economy quotas are unchanged: four yellow doors, one blue door, four yellow keys, one blue key, and no tools or red keys. Monster repair only removes unsupported special claims and keeps all concrete enemy tiles in place.",
+      "tags": [
+        "economy",
+        "quota_exact",
+        "preserved"
+      ],
+      "data": "{\"yellow_doors\":4,\"blue_doors\":1,\"red_doors\":0,\"yellow_keys\":4,\"blue_keys\":1,\"red_keys\":0,\"pickaxes\":0,\"bombs\":0,\"centerFly\":0}"
+    },
+    {
+      "stage": "monster",
+      "kind": "placement_set",
+      "label": "main_west_loop_combat_line",
+      "coordinates": [
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          9,
+          3
+        ]
+      ],
+      "description": "The reliable west-loop route to the up stair is taxed by a low entry toll, attack pressure, a threshold skeleton, and an endurance check. These are concrete no-special enemies and are spaced apart.",
+      "tags": [
+        "monster",
+        "main_route",
+        "west_loop",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[3,9],\"enemy_id\":\"redSlime\",\"tile\":202,\"specials\":[],\"role\":\"first low toll after entry yellow door\"},{\"coord\":[5,7],\"enemy_id\":\"bat\",\"tile\":205,\"specials\":[],\"role\":\"high attack pressure on west loop\"},{\"coord\":[5,3],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[],\"role\":\"upper-loop threshold check before reward line\"},{\"coord\":[9,3],\"enemy_id\":\"blackSlime\",\"tile\":203,\"specials\":[],\"role\":\"endurance check before final west-loop climb\"}]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "west_lower_branch_guard",
+      "coordinates": [
+        [
+          1,
+          8
+        ]
+      ],
+      "description": "A skeleton guards the optional west branch between the blue key and yellow key payoff, making the branch a real resource decision rather than a free pickup.",
+      "tags": [
+        "monster",
+        "optional_branch",
+        "reward_guard",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[1,8],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[],\"role\":\"optional blue-key branch guard\"}]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "central_blue_reward_guards",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          9,
+          7
+        ]
+      ],
+      "description": "The blue-door branch has staggered ordinary reward guards. The redSlime opens the branch, the blackSlime taxes the repaired red-potion and yellow-potion entrance, and the bat pressures the bridge return without unsupported zone-special claims.",
+      "tags": [
+        "monster",
+        "central_bridge",
+        "blue_door",
+        "reward_guard",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[5,5],\"enemy_id\":\"redSlime\",\"tile\":202,\"specials\":[],\"role\":\"first blue-door branch guard\"},{\"coord\":[7,7],\"enemy_id\":\"blackSlime\",\"tile\":203,\"specials\":[],\"role\":\"ordinary endurance guard over central reward entrance\"},{\"coord\":[9,7],\"enemy_id\":\"bat\",\"tile\":205,\"specials\":[],\"role\":\"return-bridge attack pressure\"}],\"repair\":\"removed invalid special 15 claim because concrete tile 203 has current stats special=0\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "route_pressure",
+      "label": "east_spine_late_pressure_and_miniboss",
+      "coordinates": [
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          3
+        ]
+      ],
+      "description": "The east-spine route receives visible ordinary pressure: a skeleton controls the yellow-key and late-door junction as a no-special gate, while a zombie serves as the late mini-boss before the final climb.",
+      "tags": [
+        "monster",
+        "east_spine",
+        "late_pressure",
+        "mini_boss",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[11,7],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[],\"role\":\"ordinary pressure at key-door junction\"},{\"coord\":[11,3],\"enemy_id\":\"zombie\",\"tile\":213,\"specials\":[],\"role\":\"late optional mini-boss on east climb\"}],\"repair\":\"removed invalid special 18 claim because concrete tile 209 has current stats special=0\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "rule_audit",
+      "label": "monster_policy_compliance",
+      "coordinates": [
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          3
+        ]
+      ],
+      "description": "All placed enemies use allowed tile codes only, have no unsupported special annotations, and have zero orthogonal enemy adjacency. All ten enemies are concrete no-special enemies, which is valid because no allowed current enemy code on this floor has a concrete special stat.",
+      "tags": [
+        "monster",
+        "allowed_enemy_codes",
+        "no_adjacent_enemies",
+        "no_special",
+        "audit",
+        "repair"
+      ],
+      "data": "{\"allowed_enemy_codes_used\":[202,203,205,209,213],\"monster_count\":10,\"specials_used\":[],\"special_enemy_count\":0,\"no_special_enemy_count\":10,\"no_special_ratio\":1.0,\"orthogonal_adjacency_violations\":0,\"repaired_issue\":\"removed unsupported special 15 and special 18 claims from annotations\"}"
+    }
+  ]
+}

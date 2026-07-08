@@ -1,0 +1,5 @@
+# Keep the local mota-js template/project bundle out of this repo index.
+mota-js/
+
+# Archive backups should stay local.
+*.zip

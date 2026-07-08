@@ -1,0 +1,4 @@
+interface:
+  display_name: "修改魔塔全局数据"
+  short_description: "Apply tower-wide mota-js data changes"
+  default_prompt: "Use $modify-mota-global-data to apply tower-wide mota-js project data changes."

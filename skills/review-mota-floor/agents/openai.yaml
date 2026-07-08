@@ -1,0 +1,4 @@
+interface:
+  display_name: "审查魔塔楼层"
+  short_description: "Review one mota floor map"
+  default_prompt: "Use $review-mota-floor to review one generated floor object against the tower brief."

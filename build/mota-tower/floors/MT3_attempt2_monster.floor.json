@@ -1,0 +1,732 @@
+{
+  "floor_id": "MT3",
+  "floor_index": 3,
+  "floor_size": 13,
+  "summary": "Monster pass for final floor MT3: preserved the repaired economy, stairs, walls, doors, keys, gems, and potions exactly, then converted all combat and special-pressure candidates into allowed concrete enemies. Enemy codes used are 206, 211, and 214 only; redPriest 218 is intentionally unused because its current special list has two entries while this floor must enforce max_specials_per_monster=1. No enemy tiles are orthogonally adjacent.",
+  "floor": {
+    "floorId": "MT3",
+    "title": "主塔 3 层",
+    "name": "3",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": false,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        32,
+        0,
+        31,
+        1,
+        22,
+        0,
+        29,
+        1,
+        0,
+        31,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        211,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        211,
+        1,
+        27,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        32,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        31,
+        0,
+        0,
+        1,
+        206,
+        28,
+        0,
+        1,
+        33,
+        82,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        214,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        211,
+        1
+      ],
+      [
+        1,
+        206,
+        1,
+        0,
+        211,
+        21,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        81,
+        1,
+        81,
+        1,
+        1,
+        1,
+        81,
+        1,
+        1,
+        1,
+        81,
+        1
+      ],
+      [
+        1,
+        88,
+        21,
+        0,
+        1,
+        0,
+        29,
+        0,
+        0,
+        21,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "preserved lower-right ascent route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          3,
+          10
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          9
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          11,
+          4
+        ],
+        [
+          11,
+          3
+        ],
+        [
+          11,
+          2
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Primary lower route remains intact. Monsters now add staged combat at the post-door lower lane, bottom-right commitment aftermath, and final right ascent without changing economy tiles.",
+      "tags": [
+        "main-route",
+        "right-spine",
+        "final-ascent",
+        "preserved"
+      ],
+      "data": "{\"route_role\":\"primary\",\"economy_status\":\"yellow_taxed\",\"monster_status\":\"concrete_enemies_added\"}"
+    },
+    {
+      "stage": "topology",
+      "kind": "candidate_route",
+      "label": "preserved upper-left loop route",
+      "coordinates": [
+        [
+          1,
+          11
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          9,
+          2
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          11,
+          1
+        ]
+      ],
+      "description": "Secondary left-loop route remains gated by the repaired yellow door and now has concrete combat taxes before the upper-left rewards and upper exit approach.",
+      "tags": [
+        "alternate-route",
+        "left-loop",
+        "branch-access",
+        "preserved"
+      ],
+      "data": "{\"route_role\":\"secondary\",\"economy_status\":\"entrance_gated\",\"monster_status\":\"concrete_enemies_added\"}"
+    },
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "tracked quota preserved",
+      "coordinates": [
+        [
+          1,
+          10
+        ],
+        [
+          3,
+          10
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          5,
+          1
+        ]
+      ],
+      "description": "Tracked economy remains exact: four yellow doors, one blue door, three yellow keys, and one blue key. No red keys, tools, bombs, pickaxes, or centerFly are present.",
+      "tags": [
+        "quota-exact",
+        "tracked-resources",
+        "preserved"
+      ],
+      "data": "{\"yellow_doors\":4,\"blue_doors\":1,\"red_doors\":0,\"yellow_keys\":3,\"blue_keys\":1,\"red_keys\":0,\"pickaxes\":0,\"bombs\":0,\"centerFly\":0}"
+    },
+    {
+      "stage": "monster",
+      "kind": "combat_chokepoint",
+      "label": "left vertical post-gate pressure",
+      "coordinates": [
+        [
+          1,
+          9
+        ]
+      ],
+      "description": "bigBat at (1,9) creates an early single-special attrition check immediately after the left-loop yellow door, so the repaired alternate route does not cheaply expose the upper-left reward chain.",
+      "tags": [
+        "enemy",
+        "bigBat",
+        "code-206",
+        "left-loop",
+        "post-door"
+      ],
+      "data": "{\"enemy_id\":\"bigBat\",\"enemy_code\":206,\"specials\":[1],\"role\":\"early first-strike attrition\",\"protects\":[[1,5],[1,1],[3,1],[3,3]]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "combat_chokepoint",
+      "label": "lower route pressure slot",
+      "coordinates": [
+        [
+          4,
+          9
+        ]
+      ],
+      "description": "skeletonCaptain at (4,9) sits after the first lower yellow door and before the staged yellow key at (5,9), turning the lower path into a combat-and-key commitment instead of a free key exchange.",
+      "tags": [
+        "enemy",
+        "skeletonCaptain",
+        "code-211",
+        "main-route",
+        "key-pressure"
+      ],
+      "data": "{\"enemy_id\":\"skeletonCaptain\",\"enemy_code\":211,\"specials\":[1],\"role\":\"sturdier balanced route tax\",\"guards\":[[5,9]]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "mini_boss",
+      "label": "central defense threshold",
+      "coordinates": [
+        [
+          7,
+          6
+        ]
+      ],
+      "description": "zombieKnight at (7,6) is the main final-floor defense threshold, controlling the central lane between the winding route, upper recovery, and late-route access.",
+      "tags": [
+        "enemy",
+        "zombieKnight",
+        "code-214",
+        "threshold",
+        "central-route"
+      ],
+      "data": "{\"enemy_id\":\"zombieKnight\",\"enemy_code\":214,\"specials\":[3],\"role\":\"defense threshold\",\"route_role\":\"central_lane\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "upper-left reward guard",
+      "coordinates": [
+        [
+          1,
+          3
+        ]
+      ],
+      "description": "skeletonCaptain at (1,3) guards the upper-left potion and gem pocket, forcing a second commitment on the left-loop branch before the larger reward payout.",
+      "tags": [
+        "enemy",
+        "skeletonCaptain",
+        "code-211",
+        "reward-guard",
+        "upper-left"
+      ],
+      "data": "{\"enemy_id\":\"skeletonCaptain\",\"enemy_code\":211,\"specials\":[1],\"role\":\"optional reward guard\",\"guards\":[[1,1],[3,1],[3,3]]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "central resource guard adjusted left",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          5
+        ]
+      ],
+      "description": "bigBat is placed at (5,5), one tile left of the blue gem at (6,5), so the gem remains preserved while access to it requires a concrete combat cost.",
+      "tags": [
+        "enemy",
+        "bigBat",
+        "code-206",
+        "coordinate-adjustment",
+        "central-gem"
+      ],
+      "data": "{\"enemy_id\":\"bigBat\",\"enemy_code\":206,\"specials\":[1],\"role\":\"central gem guard\",\"original_reward_coord\":[6,5],\"enemy_coord\":[5,5]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "special_pressure",
+      "label": "right ascent final pressure",
+      "coordinates": [
+        [
+          11,
+          8
+        ]
+      ],
+      "description": "skeletonCaptain at (11,8) converts the late right-spine special-pressure candidate into an allowed one-special enemy on the real ascent route after the lower route has paid its door costs.",
+      "tags": [
+        "enemy",
+        "skeletonCaptain",
+        "code-211",
+        "special-1",
+        "late",
+        "right-spine"
+      ],
+      "data": "{\"enemy_id\":\"skeletonCaptain\",\"enemy_code\":211,\"specials\":[1],\"role\":\"late ascent first-strike pressure\",\"route\":\"final_ascent\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "special_pressure",
+      "label": "upper exit approach pressure",
+      "coordinates": [
+        [
+          9,
+          2
+        ]
+      ],
+      "description": "skeletonCaptain at (9,2) creates the final visible upper-route tax before the exit approach, affecting both the left-loop and central-route approaches to the upFloor.",
+      "tags": [
+        "enemy",
+        "skeletonCaptain",
+        "code-211",
+        "special-1",
+        "exit-approach"
+      ],
+      "data": "{\"enemy_id\":\"skeletonCaptain\",\"enemy_code\":211,\"specials\":[1],\"role\":\"upper exit route tax\",\"route\":\"upper_exit\"}"
+    },
+    {
+      "stage": "monster",
+      "kind": "policy_check",
+      "label": "special and adjacency compliance",
+      "coordinates": [
+        [
+          9,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "description": "All placed monsters use allowed enemy tile codes and have exactly one whitelisted special. RedPriest is not placed because its current special list has two entries. No enemy is orthogonally adjacent to another enemy.",
+      "tags": [
+        "allowed-enemies",
+        "max-specials",
+        "no-orthogonal-adjacency"
+      ],
+      "data": "{\"used_enemy_codes\":[206,211,214],\"unused_allowed_enemy_codes\":[218],\"allowed_specials\":[1,2,3,15,18],\"max_specials_per_monster\":1,\"orthogonal_enemy_adjacency\":false}"
+    }
+  ]
+}

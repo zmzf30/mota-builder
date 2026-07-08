@@ -1,0 +1,4 @@
+interface:
+  display_name: "修改魔塔地图点位"
+  short_description: "Edit explicit mota-js floor points"
+  default_prompt: "Use $modify-mota-map to edit explicit points in a mota-js floor map."

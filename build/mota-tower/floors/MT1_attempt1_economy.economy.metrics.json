@@ -1,0 +1,645 @@
+{
+  "available": true,
+  "width": 13,
+  "height": 13,
+  "wall_ratio": 0.556,
+  "wall_count": 94,
+  "non_wall_cells": 75,
+  "enemy_count": 0,
+  "door_count": 5,
+  "monster_density_non_wall": 0.0,
+  "components_non_wall": 1,
+  "main_component_cells": 75,
+  "main_cycle_rank": 4,
+  "main_cycle_rank_ratio": 0.053,
+  "resource_weight_total": 17.5,
+  "tool_count": 0,
+  "free_region_cells": 7,
+  "free_region_bbox": [
+    [
+      1,
+      7
+    ],
+    [
+      3,
+      11
+    ]
+  ],
+  "free_region_reaches_exit": false,
+  "free_region_resource_count": 4,
+  "free_region_resource_weight": 5.0,
+  "free_region_resources": [
+    {
+      "id": "blueKey",
+      "coord": [
+        1,
+        7
+      ],
+      "weight": 2.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        1,
+        9
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        1,
+        10
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        2,
+        11
+      ],
+      "weight": 1.0
+    }
+  ],
+  "free_region_tools": [],
+  "free_region_keys": [
+    {
+      "id": "blueKey",
+      "coord": [
+        1,
+        7
+      ]
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        1,
+        9
+      ]
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        2,
+        11
+      ]
+    }
+  ],
+  "approx_resource_weight_by_access_cost": {
+    "0": 5.0,
+    "1": 3.0,
+    "2": 9.5,
+    "3": 0.0
+  },
+  "lowest_cost_resources": [
+    {
+      "id": "blueKey",
+      "coord": [
+        1,
+        7
+      ],
+      "approx_cost": 0.0,
+      "weight": 2.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        1,
+        9
+      ],
+      "approx_cost": 0.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        1,
+        10
+      ],
+      "approx_cost": 0.0,
+      "weight": 1.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        2,
+        11
+      ],
+      "approx_cost": 0.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redPotion",
+      "coord": [
+        5,
+        1
+      ],
+      "approx_cost": 1.0,
+      "weight": 1.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        6,
+        1
+      ],
+      "approx_cost": 1.0,
+      "weight": 1.0
+    },
+    {
+      "id": "redGem",
+      "coord": [
+        7,
+        1
+      ],
+      "approx_cost": 1.0,
+      "weight": 1.0
+    },
+    {
+      "id": "blueGem",
+      "coord": [
+        6,
+        5
+      ],
+      "approx_cost": 2.0,
+      "weight": 1.0
+    },
+    {
+      "id": "yellowPotion",
+      "coord": [
+        8,
+        7
+      ],
+      "approx_cost": 2.0,
+      "weight": 4.0
+    },
+    {
+      "id": "yellowKey",
+      "coord": [
+        11,
+        8
+      ],
+      "approx_cost": 2.0,
+      "weight": 1.0
+    },
+    {
+      "id": "bluePotion",
+      "coord": [
+        5,
+        11
+      ],
+      "approx_cost": 2.0,
+      "weight": 2.5
+    },
+    {
+      "id": "greenGem",
+      "coord": [
+        6,
+        11
+      ],
+      "approx_cost": 2.0,
+      "weight": 1.0
+    }
+  ],
+  "low_cost_resource_clusters": [
+    {
+      "threshold_cost": 0.0,
+      "bbox": [
+        [
+          1,
+          7
+        ],
+        [
+          3,
+          11
+        ]
+      ],
+      "cells": 7,
+      "resource_weight": 5.0,
+      "resources": [
+        {
+          "id": "blueKey",
+          "coord": [
+            1,
+            7
+          ],
+          "weight": 2.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            1,
+            9
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "redPotion",
+          "coord": [
+            1,
+            10
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            2,
+            11
+          ],
+          "weight": 1.0
+        }
+      ],
+      "tools": []
+    },
+    {
+      "threshold_cost": 1.0,
+      "bbox": [
+        [
+          1,
+          1
+        ],
+        [
+          11,
+          11
+        ]
+      ],
+      "cells": 52,
+      "resource_weight": 8.0,
+      "resources": [
+        {
+          "id": "redPotion",
+          "coord": [
+            5,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            6,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "redGem",
+          "coord": [
+            7,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "blueKey",
+          "coord": [
+            1,
+            7
+          ],
+          "weight": 2.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            1,
+            9
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "redPotion",
+          "coord": [
+            1,
+            10
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            2,
+            11
+          ],
+          "weight": 1.0
+        }
+      ],
+      "tools": []
+    },
+    {
+      "threshold_cost": 2.0,
+      "bbox": [
+        [
+          1,
+          1
+        ],
+        [
+          11,
+          11
+        ]
+      ],
+      "cells": 74,
+      "resource_weight": 17.5,
+      "resources": [
+        {
+          "id": "redPotion",
+          "coord": [
+            5,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            6,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "redGem",
+          "coord": [
+            7,
+            1
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "blueGem",
+          "coord": [
+            6,
+            5
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "blueKey",
+          "coord": [
+            1,
+            7
+          ],
+          "weight": 2.0
+        },
+        {
+          "id": "yellowPotion",
+          "coord": [
+            8,
+            7
+          ],
+          "weight": 4.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            11,
+            8
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            1,
+            9
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "redPotion",
+          "coord": [
+            1,
+            10
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "yellowKey",
+          "coord": [
+            2,
+            11
+          ],
+          "weight": 1.0
+        },
+        {
+          "id": "bluePotion",
+          "coord": [
+            5,
+            11
+          ],
+          "weight": 2.5
+        },
+        {
+          "id": "greenGem",
+          "coord": [
+            6,
+            11
+          ],
+          "weight": 1.0
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "suggested_relocation_cells": [
+    {
+      "coord": [
+        5,
+        5
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        7,
+        5
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        7,
+        6
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        7,
+        7
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        9,
+        7
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        11,
+        7
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        9,
+        8
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        9,
+        9
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        10,
+        9
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        11,
+        9
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        11,
+        10
+      ],
+      "approx_cost": 2.0
+    },
+    {
+      "coord": [
+        8,
+        11
+      ],
+      "approx_cost": 2.0
+    }
+  ],
+  "open_junction_wall_candidates": [
+    {
+      "coord": [
+        5,
+        3
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        9,
+        3
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        11,
+        5
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        3,
+        7
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        5,
+        9
+      ],
+      "degree": 3
+    },
+    {
+      "coord": [
+        11,
+        9
+      ],
+      "degree": 3
+    }
+  ],
+  "enemy_tiles": [],
+  "min_route_to_exit": {
+    "enemy_count": 0,
+    "door_cost": 1.0,
+    "special_red_potion_equiv": 0.0,
+    "total_cost_proxy": 1.0,
+    "steps": 32,
+    "cost_tiles": [
+      {
+        "id": "redPotion",
+        "coord": [
+          1,
+          10
+        ],
+        "code": 31
+      },
+      {
+        "id": "yellowKey",
+        "coord": [
+          1,
+          9
+        ],
+        "code": 21
+      },
+      {
+        "id": "blueKey",
+        "coord": [
+          1,
+          7
+        ],
+        "code": 22
+      },
+      {
+        "id": "yellowDoor",
+        "coord": [
+          2,
+          7
+        ],
+        "code": 81
+      },
+      {
+        "id": "redPotion",
+        "coord": [
+          5,
+          1
+        ],
+        "code": 31
+      },
+      {
+        "id": "yellowKey",
+        "coord": [
+          6,
+          1
+        ],
+        "code": 21
+      },
+      {
+        "id": "redGem",
+        "coord": [
+          7,
+          1
+        ],
+        "code": 27
+      }
+    ]
+  },
+  "special_sources": [],
+  "special_affected_cells": 0,
+  "special_can_be_fully_avoided": null,
+  "red_potion_value": 100.0
+}

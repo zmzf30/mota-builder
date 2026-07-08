@@ -1,0 +1,27 @@
+{
+  "status": "fail",
+  "issues": [
+    "Gem regions [1,2]->[1,3] and [1,5]->[3,6] are connected by an unusually easy route: score=1.2, hp_loss=65.0, key_cost=0.0, enemies=1, doors=0, steps=2; path [1,3]->[1,4]->[1,5].",
+    "Gem regions [4,4]->[4,4] and [1,5]->[3,6] are connected by an unusually easy route: score=1.81, hp_loss=20.0, key_cost=1.0, enemies=1, doors=1, steps=3; path [4,4]->[4,5]->[4,6]->[3,6].",
+    "Gem regions [4,4]->[4,4] and [8,4]->[8,6] are connected by an unusually easy route: score=1.84, hp_loss=85.0, key_cost=0.0, enemies=2, doors=0, steps=4; path [4,4]->[5,4]->[6,4]->[7,4]->[8,4].",
+    "Gem regions [5,8]->[5,8] and [7,8]->[7,8] are connected by an unusually easy route: score=2.19, hp_loss=0.0, key_cost=2.0, enemies=0, doors=1, steps=2; path [5,8]->[6,8]->[7,8]."
+  ],
+  "required_changes": [
+    "Rebuild the connection between gem regions [1,2]->[1,3] and [1,5]->[3,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [4,4]->[4,4] and [1,5]->[3,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [4,4]->[4,4] and [8,4]->[8,6]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices.",
+    "Rebuild the connection between gem regions [5,8]->[5,8] and [7,8]->[7,8]: add a stronger route gate or separate the regions so the easiest connection no longer dominates other gem-region choices."
+  ],
+  "budget_delta": {
+    "yellow_doors": 0,
+    "blue_doors": 0,
+    "red_doors": 0,
+    "yellow_keys": 0,
+    "blue_keys": 0,
+    "red_keys": 0,
+    "pickaxes": 0,
+    "bombs": 0,
+    "centerFly": 0
+  },
+  "summary": "Gem route balance reviewer found 4 route/resource imbalance issue(s)."
+}

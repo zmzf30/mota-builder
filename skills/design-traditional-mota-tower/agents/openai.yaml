@@ -1,0 +1,4 @@
+interface:
+  display_name: "传统魔塔设计"
+  short_description: "Confirm classic mota brief"
+  default_prompt: "Use $design-traditional-mota-tower to confirm the whole-tower brief before floor generation."

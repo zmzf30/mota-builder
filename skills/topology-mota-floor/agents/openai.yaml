@@ -1,0 +1,4 @@
+interface:
+  display_name: "魔塔拓扑生成"
+  short_description: "Generate one topology-only mota floor"
+  default_prompt: "Use $topology-mota-floor to generate only the structural topology for one floor."

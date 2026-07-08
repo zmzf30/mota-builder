@@ -1,0 +1,445 @@
+{
+  "floor_id": "MT1",
+  "floor_index": 1,
+  "floor_size": 13,
+  "summary": "MT1 monster stage preserves the repaired economy and route topology, adding 10 allowed enemies on ground tiles only. The main west-loop route has four distinct mandatory combat checks, the central blue-door branch has guarded rewards with one whitelist zone special, and the east spine has an optional repulse shortcut pressure plus a late mini-boss. No enemy tiles are orthogonally adjacent.",
+  "floor": {
+    "floorId": "MT1",
+    "title": "主塔 1 层",
+    "name": "1",
+    "canFlyTo": true,
+    "canFlyFrom": true,
+    "canUseQuickShop": true,
+    "cannotViewMap": false,
+    "defaultGround": "ground",
+    "images": [],
+    "ratio": 1,
+    "width": 13,
+    "height": 13,
+    "map": [
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        31,
+        21,
+        27,
+        1,
+        0,
+        0,
+        87,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0,
+        209,
+        1,
+        0,
+        0,
+        203,
+        1,
+        213,
+        1
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        1,
+        82,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1,
+        202,
+        28,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        31,
+        1,
+        1,
+        1,
+        81,
+        1
+      ],
+      [
+        1,
+        22,
+        81,
+        0,
+        0,
+        205,
+        1,
+        203,
+        34,
+        205,
+        1,
+        209,
+        1
+      ],
+      [
+        1,
+        209,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        21,
+        1
+      ],
+      [
+        1,
+        21,
+        1,
+        202,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        81,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        88,
+        21,
+        0,
+        1,
+        32,
+        29,
+        81,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "firstArrive": [],
+    "eachArrive": [],
+    "parallelDo": "",
+    "events": {},
+    "changeFloor": {},
+    "afterBattle": {},
+    "afterGetItem": {},
+    "afterOpenDoor": {},
+    "cannotMove": {},
+    "bgmap": [],
+    "fgmap": [],
+    "autoEvent": {},
+    "beforeBattle": {},
+    "cannotMoveIn": {}
+  },
+  "annotations": [
+    {
+      "stage": "economy",
+      "kind": "route_tax",
+      "label": "tracked_resource_quota_accounting_preserved",
+      "coordinates": [
+        [
+          3,
+          10
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          1,
+          7
+        ]
+      ],
+      "description": "Economy quotas are unchanged: four yellow doors, one blue door, four yellow keys, one blue key, and no tools or red keys. Monster placement only replaces ground tiles.",
+      "tags": [
+        "economy",
+        "quota_exact",
+        "preserved"
+      ],
+      "data": "{\"yellow_doors\":4,\"blue_doors\":1,\"red_doors\":0,\"yellow_keys\":4,\"blue_keys\":1,\"red_keys\":0,\"pickaxes\":0,\"bombs\":0,\"centerFly\":0}"
+    },
+    {
+      "stage": "monster",
+      "kind": "placement_set",
+      "label": "main_west_loop_combat_line",
+      "coordinates": [
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          9,
+          3
+        ]
+      ],
+      "description": "The reliable west-loop route to the up stair is taxed by a low entry toll, attack pressure, a threshold skeleton, and a final endurance check. These are mandatory but non-special and spaced apart.",
+      "tags": [
+        "monster",
+        "main_route",
+        "west_loop",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[3,9],\"enemy_id\":\"redSlime\",\"tile\":202,\"specials\":[],\"role\":\"first low toll after entry yellow door\"},{\"coord\":[5,7],\"enemy_id\":\"bat\",\"tile\":205,\"specials\":[],\"role\":\"high attack pressure on west loop\"},{\"coord\":[5,3],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[],\"role\":\"upper-loop threshold check before reward line\"},{\"coord\":[9,3],\"enemy_id\":\"blackSlime\",\"tile\":203,\"specials\":[],\"role\":\"endurance check before final west-loop climb\"}]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "reward_guard",
+      "label": "west_lower_branch_guard",
+      "coordinates": [
+        [
+          1,
+          8
+        ]
+      ],
+      "description": "A skeleton guards the optional west branch between the blue key and yellow key payoff, making the branch a real resource decision rather than a free pickup.",
+      "tags": [
+        "monster",
+        "optional_branch",
+        "reward_guard",
+        "no_special"
+      ],
+      "data": "{\"placements\":[{\"coord\":[1,8],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[],\"role\":\"optional blue-key branch guard\"}]}"
+    },
+    {
+      "stage": "monster",
+      "kind": "special_pressure",
+      "label": "central_blue_reward_zone",
+      "coordinates": [
+        [
+          5,
+          5
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          9,
+          7
+        ]
+      ],
+      "description": "The blue-door branch has staggered reward guards. The blackSlime at (7,7) carries whitelist zone special 15, affecting the central reward entrance and compensated by the blue gem, repaired red potion, and yellow potion behind the route.",
+      "tags": [
+        "monster",
+        "central_bridge",
+        "blue_door",
+        "zone_special",
+        "reward_guard"
+      ],
+      "data": "{\"placements\":[{\"coord\":[5,5],\"enemy_id\":\"redSlime\",\"tile\":202,\"specials\":[],\"role\":\"first blue-door branch guard\"},{\"coord\":[7,7],\"enemy_id\":\"blackSlime\",\"tile\":203,\"specials\":[15],\"role\":\"zone pressure over central reward entrance\",\"special_damage_red_potion_equiv\":0.75},{\"coord\":[9,7],\"enemy_id\":\"bat\",\"tile\":205,\"specials\":[],\"role\":\"return-bridge attack pressure\"}],\"specials_within_whitelist\":true,\"max_specials_per_monster\":1}"
+    },
+    {
+      "stage": "monster",
+      "kind": "special_pressure",
+      "label": "east_spine_repulse_and_miniboss",
+      "coordinates": [
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          3
+        ]
+      ],
+      "description": "The east-spine route receives visible optional pressure: a repulse skeleton controls the yellow-key and late-door junction, while a zombie serves as the late mini-boss before the final climb. The west-loop route remains a valid non-special progression route.",
+      "tags": [
+        "monster",
+        "east_spine",
+        "repulse_special",
+        "mini_boss",
+        "shortcut_pressure"
+      ],
+      "data": "{\"placements\":[{\"coord\":[11,7],\"enemy_id\":\"skeleton\",\"tile\":209,\"specials\":[18],\"role\":\"repulse pressure at key-door junction\",\"special_damage_red_potion_equiv\":0.8},{\"coord\":[11,3],\"enemy_id\":\"zombie\",\"tile\":213,\"specials\":[],\"role\":\"late optional mini-boss on east climb\"}],\"specials_within_whitelist\":true,\"max_specials_per_monster\":1}"
+    },
+    {
+      "stage": "monster",
+      "kind": "rule_audit",
+      "label": "monster_policy_compliance",
+      "coordinates": [
+        [
+          3,
+          9
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          3
+        ]
+      ],
+      "description": "All placed enemies use allowed tile codes only, use no more than one special each, and have zero orthogonal enemy adjacency. Two of ten enemies use whitelist specials, keeping the no-special ratio above policy minimum.",
+      "tags": [
+        "monster",
+        "allowed_enemy_codes",
+        "no_adjacent_enemies",
+        "special_whitelist",
+        "audit"
+      ],
+      "data": "{\"allowed_enemy_codes_used\":[202,203,205,209,213],\"monster_count\":10,\"specials_used\":[15,18],\"special_enemy_count\":2,\"no_special_enemy_count\":8,\"no_special_ratio\":0.8,\"orthogonal_adjacency_violations\":0}"
+    }
+  ]
+}
