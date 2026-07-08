@@ -1,5 +1,8 @@
 # Keep the local mota-js template/project bundle out of this repo index.
 mota-js/
 
+# Generated tower builds and intermediate artifacts stay local.
+build/
+
 # Archive backups should stay local.
 *.zip

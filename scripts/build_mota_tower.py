@@ -37,6 +37,8 @@ DEFAULT_CODEX_CONFIG = [
     'model_reasoning_effort="xhigh"',
     'service_tier="priority"',
 ]
+AGENT_BACKENDS = ("codex", "opencode")
+DEFAULT_AGENT_TIMEOUT_SECONDS = 900
 
 RESOURCE_WEIGHT_BY_ID = {
     "redGem": 1.0,
@@ -3017,6 +3019,67 @@ def build_tile_catalog(
 
 
 
+def build_codex_command(args: argparse.Namespace, schema_path: Path, output_path: Path) -> list[str]:
+    cmd = [args.codex_bin, "exec"]
+    if args.model:
+        cmd += ["--model", args.model]
+    if args.profile:
+        cmd += ["--profile", args.profile]
+    for config in args.config:
+        cmd += ["--config", config]
+    cmd += args.codex_arg
+    cmd += [
+        "--cd",
+        str(args.repo_root),
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--sandbox",
+        args.sandbox,
+        "--output-schema",
+        str(schema_path),
+        "-o",
+        str(output_path),
+        "-",
+    ]
+    return cmd
+
+
+def build_opencode_command(args: argparse.Namespace, prompt_path: Path) -> list[str]:
+    cmd = [args.opencode_bin, "run", "--dir", str(args.repo_root)]
+    if args.model:
+        cmd += ["--model", args.model]
+    cmd += args.opencode_arg
+    cmd += [
+        "Read the attached prompt file and return only the requested JSON object.",
+        "--file",
+        str(prompt_path),
+    ]
+    return cmd
+
+
+def prompt_with_inline_schema(prompt: str, schema: dict[str, Any]) -> str:
+    schema_text = json.dumps(schema, ensure_ascii=False, indent=2)
+    return (
+        prompt.rstrip()
+        + "\n\nOutput JSON Schema:\n"
+        + schema_text
+        + "\n\nReturn only one JSON object that matches this schema. Do not include markdown fences or commentary."
+    )
+
+
+def agent_exec(
+    args: argparse.Namespace,
+    prompt: str,
+    schema: dict[str, Any],
+    output_path: Path,
+) -> dict[str, Any]:
+    if args.agent_backend == "codex":
+        return codex_exec(args, prompt, schema, output_path)
+    if args.agent_backend == "opencode":
+        return opencode_exec(args, prompt, schema, output_path)
+    raise PipelineError(f"Unsupported agent backend: {args.agent_backend}")
+
+
 def codex_exec(
     args: argparse.Namespace,
     prompt: str,
@@ -3030,27 +3093,7 @@ def codex_exec(
         json.dump(schema, schema_file)
         schema_path = Path(schema_file.name)
     try:
-        cmd = [args.codex_bin, "exec"]
-        if args.model:
-            cmd += ["--model", args.model]
-        if args.profile:
-            cmd += ["--profile", args.profile]
-        for config in args.config:
-            cmd += ["--config", config]
-        cmd += args.codex_arg
-        cmd += [
-            "--cd",
-            str(args.repo_root),
-            "--skip-git-repo-check",
-            "--ephemeral",
-            "--sandbox",
-            args.sandbox,
-            "--output-schema",
-            str(schema_path),
-            "-o",
-            str(output_path),
-            "-",
-        ]
+        cmd = build_codex_command(args, schema_path, output_path)
         result = subprocess.run(
             cmd,
             input=prompt,
@@ -3069,6 +3112,52 @@ def codex_exec(
             + f"stderr:\n{result.stderr}"
         )
     return load_json_object(output_path.read_text(encoding="utf-8"))
+
+
+def opencode_exec(
+    args: argparse.Namespace,
+    prompt: str,
+    schema: dict[str, Any],
+    output_path: Path,
+) -> dict[str, Any]:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    full_prompt = prompt_with_inline_schema(prompt, schema)
+    prompt_path = output_path.with_name(output_path.name + ".prompt.md")
+    if args.keep_prompts:
+        prompt_path.write_text(full_prompt + "\n", encoding="utf-8")
+    else:
+        prompt_path = output_path.with_name(output_path.name + ".opencode.prompt.md")
+        prompt_path.write_text(full_prompt + "\n", encoding="utf-8")
+    try:
+        cmd = build_opencode_command(args, prompt_path)
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            timeout=args.timeout,
+        )
+    finally:
+        if not args.keep_prompts:
+            prompt_path.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        raise PipelineError(
+            "opencode run failed\n"
+            + f"command: {' '.join(cmd)}\n"
+            + f"stdout:\n{result.stdout}\n"
+            + f"stderr:\n{result.stderr}"
+        )
+    try:
+        parsed = load_json_object(result.stdout)
+    except (json.JSONDecodeError, PipelineError) as exc:
+        raise PipelineError(
+            "opencode output must contain a JSON object.\n"
+            + f"command: {' '.join(cmd)}\n"
+            + f"stdout:\n{result.stdout}\n"
+            + f"stderr:\n{result.stderr}"
+        ) from exc
+    write_json(output_path, parsed)
+    return parsed
 
 
 def skill_path(repo_root: Path, name: str) -> Path:
@@ -3557,7 +3646,7 @@ def run_staged_review(
     if local_review["status"] != "pass":
         return local_review
 
-    llm_review = codex_exec(
+    llm_review = agent_exec(
         args,
         staged_review_prompt(
             args,
@@ -4049,7 +4138,7 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["topology"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_topology"
-            topology_output = codex_exec(
+            topology_output = agent_exec(
                 args,
                 build_topology_prompt(
                     args,
@@ -4101,7 +4190,7 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["economy"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_economy"
-            economy_output = codex_exec(
+            economy_output = agent_exec(
                 args,
                 build_economy_prompt(
                     args,
@@ -4155,7 +4244,7 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["monster"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_monster"
-            monster_output = codex_exec(
+            monster_output = agent_exec(
                 args,
                 build_monster_special_prompt(
                     args,
@@ -4458,7 +4547,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
         brief = load_json_object(Path(args.brief_file).read_text(encoding="utf-8"))
     else:
         idea = read_text_arg(args.idea_file, args.idea_text)
-        brief = codex_exec(args, build_brief_prompt(args, idea), BRIEF_SCHEMA, brief_output)
+        brief = agent_exec(args, build_brief_prompt(args, idea), BRIEF_SCHEMA, brief_output)
     write_json(brief_output, brief)
 
     print("\nTower brief summary:")
@@ -4620,6 +4709,33 @@ def self_test(repo_root: Path) -> int:
     assert [item["resource_limits"]["yellow_doors"] for item in contracts] == [2, 2, 1]
     assert [item["resource_limits"]["blue_doors"] for item in contracts] == [1, 0, 0]
     assert contracts[2]["previous_floor_contract_summaries"][1]["floor_id"] == "MT1"
+    codex_args = argparse.Namespace(
+        codex_bin="codex",
+        model=DEFAULT_CODEX_MODEL,
+        profile=None,
+        config=list(DEFAULT_CODEX_CONFIG),
+        codex_arg=[],
+        repo_root=repo_root,
+        sandbox="read-only",
+    )
+    codex_cmd = build_codex_command(codex_args, Path("/tmp/schema.json"), Path("/tmp/output.json"))
+    assert codex_cmd[:4] == ["codex", "exec", "--model", DEFAULT_CODEX_MODEL]
+    assert 'model_reasoning_effort="xhigh"' in codex_cmd
+    assert 'service_tier="priority"' in codex_cmd
+    opencode_args = argparse.Namespace(
+        opencode_bin="opencode",
+        model=None,
+        opencode_arg=[],
+        repo_root=repo_root,
+    )
+    opencode_cmd = build_opencode_command(opencode_args, Path("/tmp/prompt.md"))
+    opencode_cmd_text = " ".join(opencode_cmd)
+    assert opencode_cmd[:4] == ["opencode", "run", "--dir", str(repo_root)]
+    assert "--model" not in opencode_cmd
+    assert "model_reasoning_effort" not in opencode_cmd_text
+    assert "service_tier" not in opencode_cmd_text
+    parsed_defaults = parse_args(["--self-test"])
+    assert parsed_defaults.timeout == DEFAULT_AGENT_TIMEOUT_SECONDS
     args = argparse.Namespace(repo_root=repo_root)
     maps, enemys = load_project_tables(args)
     sample_floor_output = {
@@ -5004,7 +5120,7 @@ def self_test(repo_root: Path) -> int:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Build a classic mota tower with headless Codex agents.")
+    parser = argparse.ArgumentParser(description="Build a classic mota tower with headless coding agents.")
     parser.add_argument("--idea-file", help="Path to the user's tower idea text.")
     parser.add_argument("--idea-text", help="Inline tower idea text.")
     parser.add_argument("--brief-file", help="Use an existing confirmed tower_brief JSON and skip stage 0.")
@@ -5035,23 +5151,37 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--yes", action="store_true", help="Skip interactive confirmation.")
     parser.add_argument("--clean", action="store_true", help="Remove the output directory first; only allowed under repo build/.")
     parser.add_argument("--resume-existing", action="store_true", help="Reuse existing accepted floor/review JSON files in the output directory.")
-    parser.add_argument("--keep-prompts", action="store_true", help="Write each Codex prompt next to its output JSON.")
+    parser.add_argument("--keep-prompts", action="store_true", help="Write each agent prompt next to its output JSON.")
+    parser.add_argument(
+        "--agent-backend",
+        choices=AGENT_BACKENDS,
+        default="codex",
+        help="Agent runner for internal LLM calls. Default: codex.",
+    )
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument(
         "--model",
-        default=DEFAULT_CODEX_MODEL,
-        help=f"Codex model for all internal calls. Default: {DEFAULT_CODEX_MODEL}.",
+        help=(
+            f"Model for internal calls. Codex defaults to {DEFAULT_CODEX_MODEL}; "
+            "OpenCode only receives --model when this is set explicitly."
+        ),
     )
     parser.add_argument("--profile", help="Optional Codex config profile.")
     parser.add_argument(
         "--config",
         action="append",
-        default=list(DEFAULT_CODEX_CONFIG),
-        help="Extra codex exec --config key=value; repeatable. Defaults include xhigh reasoning and priority service tier.",
+        help="Extra codex exec --config key=value; repeatable. Codex defaults include xhigh reasoning and priority service tier.",
     )
     parser.add_argument("--codex-arg", action="append", default=[], help="Extra raw codex exec argument; repeatable.")
-    parser.add_argument("--timeout", type=int, help="Per Codex call timeout in seconds.")
-    parser.add_argument("--sandbox", default="read-only", choices=["read-only", "workspace-write", "danger-full-access"])
+    parser.add_argument("--opencode-bin", default="opencode")
+    parser.add_argument("--opencode-arg", action="append", default=[], help="Extra raw opencode run argument; repeatable.")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_AGENT_TIMEOUT_SECONDS,
+        help=f"Per agent call timeout in seconds. Default: {DEFAULT_AGENT_TIMEOUT_SECONDS}.",
+    )
+    parser.add_argument("--sandbox", default="read-only", choices=["read-only", "workspace-write", "danger-full-access"], help="Codex sandbox mode.")
     parser.add_argument("--skip-playtest", action="store_true", help="Do not run browser playtests after floor reviews.")
     parser.add_argument(
         "--playtest-policy",
@@ -5062,7 +5192,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--playtest-timeout", type=int, default=120, help="Browser playtest timeout in seconds.")
     parser.add_argument("--playtest-max-steps", type=int, default=160, help="Maximum keyboard steps per playtest route.")
     parser.add_argument("--playtest-routes", type=int, default=4, help="Number of keyboard route profiles to try.")
-    parser.add_argument("--self-test", action="store_true", help="Run local tests without calling Codex.")
+    parser.add_argument("--self-test", action="store_true", help="Run local tests without calling an external agent.")
     args = parser.parse_args(argv)
     if args.max_attempts <= 0:
         parser.error("--max-attempts must be positive")
@@ -5074,6 +5204,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("--parallel-floors cannot be combined with --resume-existing")
     if args.floor_number_offset < 0:
         parser.error("--floor-number-offset must be non-negative")
+    if args.agent_backend == "codex":
+        if args.model is None:
+            args.model = DEFAULT_CODEX_MODEL
+        args.config = list(DEFAULT_CODEX_CONFIG) + (args.config or [])
+    else:
+        if args.profile:
+            parser.error("--profile is only supported with --agent-backend codex")
+        if args.config:
+            parser.error("--config is only supported with --agent-backend codex; use --opencode-arg for OpenCode")
+        if args.codex_arg:
+            parser.error("--codex-arg is only supported with --agent-backend codex; use --opencode-arg for OpenCode")
+        args.config = []
     if not args.self_test and not args.brief_file and not (args.idea_file or args.idea_text):
         parser.error("provide --idea-file or --idea-text, unless --brief-file is used")
     return args

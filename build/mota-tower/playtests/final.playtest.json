@@ -1,9 +1,0 @@
-{
-  "status": "skipped",
-  "summary": "Could not install Playwright for browser playtest.",
-  "issues": [
-    "exit 1"
-  ],
-  "mota_root": "/Users/kanyun/workspace/learn/mota/mota-js",
-  "project_dir": "/Users/kanyun/workspace/learn/mota/build/mota-tower/project"
-}

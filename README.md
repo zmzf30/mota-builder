@@ -52,6 +52,7 @@
 
 - Python 3
 - 已配置可用的 `codex` 命令行工具
+- 可选：已配置可用的 `opencode` 命令行工具，用于 `--agent-backend opencode`
 - Node.js 和 npm，用于浏览器试玩阶段自动安装并运行 Playwright
 - 可访问本机浏览器环境；试玩会访问 `http://127.0.0.1:1055/`，必要时回退到 `1056`
 
@@ -131,9 +132,28 @@ python3 scripts/build_mota_tower.py \
 - `--brief-file <path>`：从已有 `tower_brief.json` 继续。
 - `--resume-existing`：复用输出目录中已有的楼层审查结果继续生成。
 - `--parallel-floors --floor-concurrency 4`：并发生成楼层，速度更快，但每层会先被分配固定资源预算。
+- `--agent-backend codex|opencode`：选择内部 LLM 调用后端；默认 `codex`。
+- `--model <model>`：指定后端模型。默认 Codex 会传 `--model gpt-5.5`；OpenCode 只有显式设置时才会传 `--model`，通常写成 `provider/model`。
+- `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认还会传 `model_reasoning_effort="xhigh"` 和 `service_tier="priority"`。
+- `--codex-arg <arg>`：额外传给 `codex exec` 的原始参数，可重复。
+- `--opencode-arg <arg>`：额外传给 `opencode run` 的原始参数，可重复。使用 OpenCode 时不会传 Codex 专用的 `model_reasoning_effort` 或 `service_tier`。
+- `--timeout <seconds>`：单次 agent 调用超时时间，默认 `900` 秒（15 分钟）。
 - `--skip-playtest`：跳过浏览器试玩。
-- `--keep-prompts`：保留每个阶段发给 Codex 的 prompt，方便调试。
-- `--self-test`：运行脚本内置本地测试，不调用 Codex。
+- `--keep-prompts`：保留每个阶段发给 agent 的 prompt，方便调试。
+- `--self-test`：运行脚本内置本地测试，不调用外部 agent。
+
+OpenCode 示例：
+
+```bash
+python3 scripts/build_mota_tower.py \
+  --agent-backend opencode \
+  --model deepseek/deepseek-chat \
+  --idea-text "做一座 4 层、11x11、偏传统钥匙门博弈的魔塔" \
+  --brief-only \
+  --out-dir build/mota-tower-opencode
+```
+
+Codex 后端使用 `codex exec --output-schema` 强制结构化输出；OpenCode 后端会把 JSON schema 写入 prompt 并解析最终输出，因此结构化稳定性取决于所选 OpenCode provider/model。
 
 ## 浏览器试玩生成结果
 
