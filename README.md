@@ -1,6 +1,6 @@
 # Mota Builder
 
-基于 `mota-js`， python 和codex（目前仅支持codex cli，建议使用不低于GPT 5.5 xhigh能力的模型）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
+基于 `mota-js`、Python 和 AI Agent 后端（默认使用并建议使用 Codex CLI，推荐不低于 GPT-5.5 xhigh 能力的模型；同时也支持通过 `--agent-backend opencode` 使用 OpenCode）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
 
 `mota-js/` 是本地 HTML5 魔塔样板工程目录，需要您clone https://github.com/ckcz123/mota-js并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
 
@@ -55,6 +55,8 @@
 - 可选：已配置可用的 `opencode` 命令行工具，用于 `--agent-backend opencode`
 - Node.js 和 npm，用于浏览器试玩阶段自动安装并运行 Playwright
 - 可访问本机浏览器环境；试玩会访问 `http://127.0.0.1:1055/`，必要时回退到 `1056`
+- 最低资源建议：至少 4 核 CPU、16GB 内存，以及楼层数 x 3,000,000 的可用 token 额度。
+- 推荐资源：8 核以上 CPU、32GB 以上内存，以及楼层数 x 8,000,000 的可用 token 额度。
 
 ## 快速开始
 
@@ -112,7 +114,7 @@ python3 scripts/build_mota_tower.py \
 - `build/mota-tower-demo/project/`
 - `build/mota-tower-demo/playtests/`
 
-`project/` 是可运行的生成结果。流水线默认不会直接覆盖 `mota-js/project/`。
+`project/` 是可运行的生成结果。流水线默认不会直接覆盖 `mota-js/project/`。需要使用生成内容时，将生成产物替换到 `mota-js/project/` 下的对应文件即可。
 
 ### 一步式生成
 
@@ -187,33 +189,3 @@ python3 skills/playtest-mota-game/scripts/playtest_mota_game.py \
 - 不依赖随机、隐藏脚本、新素材、复杂 UI、插件机制或重剧情事件。
 
 这些约束主要写在 `skills/*/SKILL.md` 和 `scripts/build_mota_tower.py` 中。修改约束时建议先调整技能说明，再运行 `--self-test` 和小规模生成验证。
-
-## 修改已有项目
-
-手工修改时，优先改 `mota-js/project/` 下的数据文件：
-
-- 改全局配置、初始属性、楼层顺序：`mota-js/project/data.js`
-- 改怪物属性、金币、经验、特殊能力：`mota-js/project/enemys.js`
-- 改单层地图点位、楼梯、门、钥匙、怪物摆放：`mota-js/project/floors/*.js`
-- 查图块数字码：`mota-js/project/maps.js`
-
-生成结果在 `build/<name>/project/` 中。确认要采纳生成结果前，建议先比较它和 `mota-js/project/` 的差异，再决定是否复制覆盖。
-
-## 验证
-
-运行流水线本地测试：
-
-```bash
-python3 scripts/build_mota_tower.py --self-test
-```
-
-运行游戏服务后，也可以直接打开编辑器和游戏页面做人工验证。
-
-## 许可证和来源
-
-`mota-js/` 为 HTML5 魔塔样板工程，相关说明和许可见：
-
-- `mota-js/README.md`
-- `mota-js/LICENSE.md`
-
-本仓库新增的生成脚本、技能说明和构造产物围绕该样板工程工作。发布或分发成品前，请同时确认样板工程素材、音频、工具和新增内容的授权边界。
