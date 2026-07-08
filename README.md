@@ -29,7 +29,7 @@ git clone https://github.com/ckcz123/mota-js.git
 AI 终端会代为调用本仓库的生成脚本，默认使用 Codex 后端，生成结果写入 `build/mota-tower/`，不会直接覆盖 `mota-js/project/`。如果要用 OpenCode，在提示词末尾追加：
 
 ```text
-使用 --agent-backend opencode，并使用模型 deepseek/deepseek-chat。
+使用 --agent-backend opencode。
 ```
 
 生成完成后重点查看：
