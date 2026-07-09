@@ -55,7 +55,7 @@ Before returning a buildable brief, identify whether these values are present or
 - Red, blue, yellow, and green potion values.
 - Shop progressive gold-cost rule and attack/defense gain per purchase.
 - Whole-tower yellow/blue/red door quantity or density.
-- Whole-tower yellow/blue/red key, pickaxe, bomb, and centerFly quantity or density.
+- Whole-tower yellow/blue/red key, pickaxe, bomb, centerFly, jumpShoes, gem, and potion quantity or density.
 
 ## Output Contract
 
@@ -79,7 +79,15 @@ Use this shape:
     "red_keys": 0,
     "pickaxes": 0,
     "bombs": 0,
-    "centerFly": 0
+    "centerFly": 0,
+    "jumpShoes": 0,
+    "redGems": 0,
+    "blueGems": 0,
+    "greenGems": 0,
+    "redPotions": 0,
+    "bluePotions": 0,
+    "yellowPotions": 0,
+    "greenPotions": 0
   },
   "global_settings": {
     "initial_hero": {

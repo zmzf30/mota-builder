@@ -127,7 +127,15 @@ Use the JSON schema supplied by the orchestrator. In the staged pipeline, issues
     "red_keys": 0,
     "pickaxes": 0,
     "bombs": 0,
-    "centerFly": 0
+    "centerFly": 0,
+    "jumpShoes": 0,
+    "redGems": 0,
+    "blueGems": 0,
+    "greenGems": 0,
+    "redPotions": 0,
+    "bluePotions": 0,
+    "yellowPotions": 0,
+    "greenPotions": 0
   },
   "summary": "short review summary"
 }

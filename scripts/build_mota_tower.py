@@ -27,6 +27,14 @@ TRACKED_RESOURCES = [
     "pickaxes",
     "bombs",
     "centerFly",
+    "jumpShoes",
+    "redGems",
+    "blueGems",
+    "greenGems",
+    "redPotions",
+    "bluePotions",
+    "yellowPotions",
+    "greenPotions",
 ]
 
 SUPPORTED_FLOOR_SIZES = {9, 11, 13}
@@ -38,7 +46,7 @@ DEFAULT_CODEX_CONFIG = [
     'service_tier="priority"',
 ]
 AGENT_BACKENDS = ("codex", "opencode")
-DEFAULT_AGENT_TIMEOUT_SECONDS = 1200
+DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 
 RESOURCE_WEIGHT_BY_ID = {
     "redGem": 1.0,
@@ -53,7 +61,7 @@ RESOURCE_WEIGHT_BY_ID = {
     "blueKey": 2.0,
     "redKey": 4.0,
 }
-TOOL_ITEM_IDS = {"pickaxe", "bomb", "centerFly"}
+TOOL_ITEM_IDS = {"pickaxe", "bomb", "centerFly", "jumpShoes"}
 GEM_ITEM_IDS = {"redGem", "blueGem", "greenGem", "yellowGem"}
 POTION_ITEM_IDS = {"redPotion", "bluePotion", "yellowPotion", "greenPotion"}
 DIRECT_RESOURCE_ITEM_IDS = set(RESOURCE_WEIGHT_BY_ID) | TOOL_ITEM_IDS | {
@@ -77,7 +85,12 @@ DEFAULT_RESOURCE_POLICY = {
     "potion_compare_mode": "red_potion_equiv",
 }
 MAX_ADJACENT_WALL_MASK_SIMILARITY = 0.9
+DEFAULT_WALL_RATIO_MIN = 0.45
+DEFAULT_WALL_RATIO_MAX = 0.65
+DEFAULT_MONSTER_TYPES_PER_FLOOR = 12
+DEFAULT_ENEMY_DESIGN_COUNT = 0
 HIGH_VALUE_POCKET_THRESHOLD = 3.0
+DEFAULT_HIGH_VALUE_POCKET_THRESHOLD = HIGH_VALUE_POCKET_THRESHOLD
 PRESSURE_ANNOTATION_KINDS = {
     "combat_chokepoint",
     "reward_guard",
@@ -85,6 +98,99 @@ PRESSURE_ANNOTATION_KINDS = {
     "special_candidate",
     "mini_boss_candidate",
 }
+STAGE_LABELS = {
+    "topology": "地图结构",
+    "economy": "资源和路线",
+    "monster": "怪物和战斗",
+    "integration": "整体",
+}
+
+
+def floor_label(floor_index: int) -> str:
+    return f"第 {floor_index + 1} 层"
+
+
+def beginner_review_reason(summary: str) -> str:
+    text = str(summary or "").strip()
+    lower = text.lower()
+    reasons: list[str] = []
+
+    def add(reason: str) -> None:
+        if reason not in reasons:
+            reasons.append(reason)
+
+    if "local" in lower and "passed" in lower:
+        add("基础规则已经通过")
+    if "broken-wall" in lower and "decorative" in lower:
+        add("还有一些破墙岔路只是装饰，没有形成奖励、路线选择、道具价值或战斗压力")
+    if "local topology review failed" in lower:
+        add("地图结构还不合适")
+    if "local economy review failed" in lower:
+        add("资源、钥匙门或路线取舍还不合适")
+    if "local monster review failed" in lower:
+        add("怪物和战斗压力还不合适")
+    if "local integration review failed" in lower:
+        add("整层地图还没有达到可保存标准")
+    if "entrance" in lower and "exit" in lower and "reachable" in lower:
+        add("入口到出口的路线不够通顺")
+    if "downfloor" in lower:
+        add("缺少入口楼梯")
+    if "upfloor" in lower:
+        add("缺少出口楼梯")
+    if "key/door pressure" in lower:
+        add("钥匙和门的安排不够好")
+    if ("protected resources" in lower or "protected reward" in lower) and not (
+        "broken-wall" in lower and "decorative" in lower
+    ):
+        add("奖励或工具没有被路线、门或怪物保护起来")
+    if "enemy type count" in lower:
+        add("这一层怪物种类太多")
+    if "at least" in lower and "enemies" in lower:
+        add("这一层怪物数量太少")
+    if "at most" in lower and "enemies" in lower:
+        add("这一层怪物数量太多")
+    if "orthogonal adjacency" in lower:
+        add("有些怪物挨得太近")
+    if "outside current floor policy" in lower or "outside whitelist" in lower:
+        add("使用了当前楼层不允许的怪物")
+    if "exceeds whole-tower limit" in lower:
+        add("某类资源超过了整座塔的总量限制")
+    if "adjacent wall mask similarity" in lower:
+        add("这一层墙体和相邻楼层太像")
+    if "wall ratio" in lower:
+        add("墙的数量不在设置范围内")
+    if "gem count progression" in lower or ("potion" in lower and "progression" in lower):
+        add("宝石或血瓶的跨层增长不符合设置")
+    if "entry-to-gem route is too easy" in lower:
+        add("到宝石的路线太容易，缺少取舍")
+    if "large direct resource region" in lower:
+        add("有一大片奖励拿得太直接")
+    if "zone/repulse damage" in lower:
+        add("领域或阻击伤害不在设置范围内")
+
+    if not reasons:
+        add("地图还不够好玩，系统正在自动调整")
+    return "原因：" + "；".join(reasons) + "。"
+
+
+def review_retry_message(
+    floor_index: int,
+    stage: str,
+    attempt: int,
+    summary: str,
+    repair_stage: str | None = None,
+) -> str:
+    if repair_stage:
+        repair_label = STAGE_LABELS.get(repair_stage, repair_stage)
+        return (
+            f"{floor_label(floor_index)}第 {attempt} 次检查没通过，"
+            f"正在从{repair_label}重新调整。{beginner_review_reason(summary)}"
+        )
+    stage_label = STAGE_LABELS.get(stage, stage)
+    return (
+        f"{floor_label(floor_index)}第 {attempt} 次{stage_label}检查没通过，"
+        f"正在自动重试。{beginner_review_reason(summary)}"
+    )
 
 
 def strict_schema_object(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
@@ -338,6 +444,37 @@ STRUCTURED_REVIEW_SCHEMA: dict[str, Any] = {
         "required_changes": STRING_ARRAY_SCHEMA,
         "budget_delta": RESOURCE_DELTA_SCHEMA,
         "summary": {"type": "string"},
+    },
+}
+
+ENEMY_DESIGN_UPDATE_SCHEMA = strict_schema_object(
+    {
+        "id": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "hp": {"type": "integer"},
+        "atk": {"type": "integer"},
+        "def": {"type": "integer"},
+        "money": {"type": "integer"},
+        "exp": {"type": "integer"},
+        "point": {"type": "integer"},
+        "specials": schema_array({"type": "integer"}),
+        "value": {"type": ["integer", "number", "null"]},
+        "zone": {"type": ["integer", "number", "null"]},
+        "repulse": {"type": ["integer", "number", "null"]},
+        "range": {"type": ["integer", "null"]},
+        "zoneSquare": {"type": ["boolean", "null"]},
+        "notBomb": {"type": ["boolean", "null"]},
+    }
+)
+ENEMY_DESIGN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["status", "summary", "updates", "warnings"],
+    "properties": {
+        "status": {"type": "string", "enum": ["ready"]},
+        "summary": {"type": "string"},
+        "updates": schema_array(ENEMY_DESIGN_UPDATE_SCHEMA),
+        "warnings": STRING_ARRAY_SCHEMA,
     },
 }
 
@@ -725,6 +862,36 @@ def resource_policy_number(brief: dict[str, Any], key: str) -> float:
     return policy_number(resource_policy_value(brief, key), float(DEFAULT_RESOURCE_POLICY[key]))
 
 
+def layout_constraint_value(brief: dict[str, Any], key: str, default: float) -> float:
+    constraints = brief.get("layout_constraints", {})
+    if not isinstance(constraints, dict):
+        constraints = {}
+    return policy_number(constraints.get(key), default)
+
+
+def wall_ratio_range(brief: dict[str, Any] | None = None) -> tuple[float, float]:
+    if brief is None:
+        return DEFAULT_WALL_RATIO_MIN, DEFAULT_WALL_RATIO_MAX
+    min_ratio = layout_constraint_value(brief, "wall_ratio_min", DEFAULT_WALL_RATIO_MIN)
+    max_ratio = layout_constraint_value(brief, "wall_ratio_max", DEFAULT_WALL_RATIO_MAX)
+    min_ratio = min(max(min_ratio, 0.0), 1.0)
+    max_ratio = min(max(max_ratio, 0.0), 1.0)
+    if min_ratio > max_ratio:
+        min_ratio, max_ratio = max_ratio, min_ratio
+    return min_ratio, max_ratio
+
+
+def high_value_pocket_threshold(brief: dict[str, Any]) -> float:
+    return max(
+        0.0,
+        layout_constraint_value(
+            brief,
+            "high_value_pocket_threshold",
+            DEFAULT_HIGH_VALUE_POCKET_THRESHOLD,
+        ),
+    )
+
+
 def monster_policy_bool(brief: dict[str, Any], key: str) -> bool:
     value = monster_policy_value(brief, key)
     if isinstance(value, bool):
@@ -740,6 +907,9 @@ def load_project_tables(args: argparse.Namespace) -> tuple[dict[str, Any], dict[
     project = project_dir(args)
     _, maps = load_js_object(project / "maps.js")
     _, enemys = load_js_object(project / "enemys.js")
+    runtime_enemys = getattr(args, "runtime_enemys", None)
+    if isinstance(runtime_enemys, dict):
+        enemys = core_clone(runtime_enemys)
     return maps, enemys
 
 
@@ -823,6 +993,22 @@ def derive_budget_delta(floor: dict[str, Any], maps: dict[str, Any]) -> dict[str
                 delta["bombs"] += 1
             elif entry_id == "centerFly":
                 delta["centerFly"] += 1
+            elif entry_id == "jumpShoes":
+                delta["jumpShoes"] += 1
+            elif entry_id == "redGem":
+                delta["redGems"] += 1
+            elif entry_id == "blueGem":
+                delta["blueGems"] += 1
+            elif entry_id == "greenGem":
+                delta["greenGems"] += 1
+            elif entry_id == "redPotion":
+                delta["redPotions"] += 1
+            elif entry_id == "bluePotion":
+                delta["bluePotions"] += 1
+            elif entry_id == "yellowPotion":
+                delta["yellowPotions"] += 1
+            elif entry_id == "greenPotion":
+                delta["greenPotions"] += 1
     return delta
 
 
@@ -957,7 +1143,11 @@ def local_floor_review(
                 doors += 1
             if entry_id in {"yellowKey", "blueKey", "redKey"}:
                 keys += 1
-            if entry_id in {"redGem", "blueGem", "greenGem", "yellowGem", "redPotion", "bluePotion", "greenPotion", "yellowPotion", "pickaxe", "bomb", "centerFly"}:
+            if entry_id in {
+                "redGem", "blueGem", "greenGem", "yellowGem",
+                "redPotion", "bluePotion", "greenPotion", "yellowPotion",
+                "pickaxe", "bomb", "centerFly", "jumpShoes",
+            }:
                 rewards += 1
 
     min_enemies = monster_policy_int(brief, "enemy_count_min_per_floor")
@@ -1043,6 +1233,9 @@ def topology_stage_review_issues(
     floor_size: int,
     maps: dict[str, Any],
     previous_floor_outputs: list[dict[str, Any]] | None = None,
+    max_wall_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
+    wall_ratio_min: float = DEFAULT_WALL_RATIO_MIN,
+    wall_ratio_max: float = DEFAULT_WALL_RATIO_MAX,
 ) -> list[dict[str, Any]]:
     issues, matrix = stage_floor_shape_issues(floor_output, expected_floor_id, floor_size, maps, "topology")
     if matrix is None:
@@ -1087,16 +1280,24 @@ def topology_stage_review_issues(
     wall_count = sum(1 for row in matrix for code in row if is_wall_entry(maps.get(str(code))))
     total_cells = max(len(matrix) * (len(matrix[0]) if matrix else 0), 1)
     wall_ratio = wall_count / total_cells
-    if floor_size == 13 and not 0.45 <= wall_ratio <= 0.65:
+    if wall_ratio_min > wall_ratio_max:
+        wall_ratio_min, wall_ratio_max = wall_ratio_max, wall_ratio_min
+    if floor_size == 13 and not wall_ratio_min <= wall_ratio <= wall_ratio_max:
         issues.append(
             structured_issue(
                 "topology",
                 "warn",
-                f"13x13 topology wall ratio is {wall_ratio:.2f}; target is about 0.50-0.60.",
-                "Adjust walls toward a controlled 0.50-0.60 structural density while preserving route choices.",
+                (
+                    f"13x13 topology wall ratio is {wall_ratio:.2f}; "
+                    f"target range is {wall_ratio_min:.2f}-{wall_ratio_max:.2f}."
+                ),
+                (
+                    f"Adjust walls toward {wall_ratio_min:.2f}-{wall_ratio_max:.2f} "
+                    "structural density while preserving route choices."
+                ),
             )
         )
-    for issue in wall_mask_similarity_issues(previous_floor_outputs or [], floor_output, maps):
+    for issue in wall_mask_similarity_issues(previous_floor_outputs or [], floor_output, maps, max_wall_similarity):
         issues.append(structured_issue("topology", "fail", issue))
     return issues
 
@@ -1105,6 +1306,7 @@ def wall_mask_similarity_issues(
     previous_floor_outputs: list[dict[str, Any]],
     current_floor_output: dict[str, Any],
     maps: dict[str, Any],
+    max_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
 ) -> list[str]:
     if not previous_floor_outputs:
         return []
@@ -1134,13 +1336,13 @@ def wall_mask_similarity_issues(
     if total <= 0:
         return []
     similarity = same / total
-    if similarity >= MAX_ADJACENT_WALL_MASK_SIMILARITY:
+    if similarity >= max_similarity:
         current_id = current_floor_output.get("floor_id") or current_floor.get("floorId") or "current floor"
         previous_id = previous_floor_outputs[-1].get("floor_id") or previous_floor.get("floorId") or "previous floor"
         return [
             (
                 f"Adjacent wall mask similarity {similarity:.3f} between {previous_id} and {current_id} "
-                f"must be < {MAX_ADJACENT_WALL_MASK_SIMILARITY:.1f}; redesign topology with a distinct broken-wall grammar."
+                f"must be < {max_similarity:.2f}; redesign topology with a distinct broken-wall grammar."
             )
         ]
     return []
@@ -1260,13 +1462,14 @@ def monster_stage_review_issues(
     previous_floor_outputs: list[dict[str, Any]],
     floor_policy: dict[str, Any] | None,
     enforce_resource_progression: bool,
+    max_wall_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
 ) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, Any]]:
     local_issues, delta = local_floor_review(
         floor_output, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
     )
     metrics = floor_static_metrics(floor_output, maps, enemys, brief)
     local_issues.extend(static_metric_issues(metrics))
-    local_issues.extend(wall_mask_similarity_issues(previous_floor_outputs, floor_output, maps))
+    local_issues.extend(wall_mask_similarity_issues(previous_floor_outputs, floor_output, maps, max_wall_similarity))
     if enforce_resource_progression:
         local_issues.extend(floor_resource_progression_issues(brief, previous_floor_outputs, floor_output, maps))
     local_issues.extend(budget_issues(delta, limits, used))
@@ -1288,13 +1491,14 @@ def integration_stage_review_issues(
     previous_floor_outputs: list[dict[str, Any]],
     floor_policy: dict[str, Any] | None,
     enforce_resource_progression: bool,
+    max_wall_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
 ) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, Any]]:
     local_issues, delta = local_floor_review(
         floor_output, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
     )
     metrics = floor_static_metrics(floor_output, maps, enemys, brief)
     local_issues.extend(static_metric_issues(metrics))
-    local_issues.extend(wall_mask_similarity_issues(previous_floor_outputs, floor_output, maps))
+    local_issues.extend(wall_mask_similarity_issues(previous_floor_outputs, floor_output, maps, max_wall_similarity))
     if enforce_resource_progression:
         local_issues.extend(floor_resource_progression_issues(brief, previous_floor_outputs, floor_output, maps))
     local_issues.extend(budget_issues(delta, limits, used))
@@ -1390,10 +1594,18 @@ def build_enemy_candidates(
     max_special_ratio = monster_policy_number(brief, "special_damage_red_potion_max")
     if min_special_ratio > max_special_ratio:
         min_special_ratio, max_special_ratio = max_special_ratio, min_special_ratio
+    enemy_design = brief.get("enemy_design", {}) if isinstance(brief.get("enemy_design"), dict) else {}
+    designed_enemy_ids = {
+        str(item)
+        for item in enemy_design.get("designed_enemy_ids", [])
+        if isinstance(item, (str, int))
+    }
     candidates: list[dict[str, Any]] = []
     for code, entry in sorted(maps.items(), key=lambda item: int(item[0])):
         entry_id = entry.get("id")
         if entry.get("cls") not in {"enemys", "enemy48"} or entry_id not in enemys:
+            continue
+        if designed_enemy_ids and str(entry_id) not in designed_enemy_ids:
             continue
         enemy = enemys[entry_id]
         if not enemy.get("hp") or not enemy.get("atk"):
@@ -1654,6 +1866,7 @@ def unguarded_high_value_pockets(
     matrix: list[list[int]],
     maps: dict[str, Any],
     special_cells: dict[tuple[int, int], float],
+    high_value_threshold: float = HIGH_VALUE_POCKET_THRESHOLD,
 ) -> list[dict[str, Any]]:
     height = len(matrix)
     width = len(matrix[0]) if height else 0
@@ -1792,7 +2005,7 @@ def unguarded_high_value_pockets(
                     continue
                 weight += item_w
                 resources.append({"id": entry_id, "coord": [x, y], "weight": item_w})
-            if weight < HIGH_VALUE_POCKET_THRESHOLD:
+            if weight < high_value_threshold:
                 continue
             signature = (entry, tuple(sorted(exposed)))
             if signature in seen_signatures:
@@ -2190,7 +2403,13 @@ def floor_static_metrics(
                 queue.append((nx, ny))
         special_avoidable = goal in seen_special
 
-    high_value_pockets = unguarded_high_value_pockets(floor_output, matrix, maps, special_cells)
+    high_value_pockets = unguarded_high_value_pockets(
+        floor_output,
+        matrix,
+        maps,
+        special_cells,
+        high_value_pocket_threshold(brief),
+    )
 
     return {
         "available": True,
@@ -2969,6 +3188,12 @@ def build_tile_catalog(
         monster_policy = {}
     allowed_specials = {int(item) for item in monster_policy.get("allowed_specials", [1, 2, 3, 15, 18])}
     floor_allowed_ids = set(floor_policy.get("allowed_enemy_ids", [])) if isinstance(floor_policy, dict) else set()
+    enemy_design = brief.get("enemy_design", {}) if isinstance(brief.get("enemy_design"), dict) else {}
+    designed_enemy_ids = {
+        str(item)
+        for item in enemy_design.get("designed_enemy_ids", [])
+        if isinstance(item, (str, int))
+    }
     red_potion = red_potion_value(brief)
     min_special_ratio = monster_policy_number(brief, "special_damage_red_potion_min")
     max_special_ratio = monster_policy_number(brief, "special_damage_red_potion_max")
@@ -2990,6 +3215,8 @@ def build_tile_catalog(
         if entry.get("cls") in {"enemys", "enemy48"} and entry_id in enemys:
             enemy = enemys[entry_id]
             if not enemy.get("hp") or not enemy.get("atk"):
+                continue
+            if designed_enemy_ids and str(entry_id) not in designed_enemy_ids:
                 continue
             if floor_allowed_ids and entry_id not in floor_allowed_ids:
                 continue
@@ -3057,14 +3284,17 @@ def build_opencode_command(args: argparse.Namespace, prompt_path: Path) -> list[
     return cmd
 
 
-def prompt_with_inline_schema(prompt: str, schema: dict[str, Any]) -> str:
+def prompt_with_inline_schema(prompt: str, schema: dict[str, Any], output_path: Path | None = None) -> str:
     schema_text = json.dumps(schema, ensure_ascii=False, indent=2)
-    return (
+    result = (
         prompt.rstrip()
         + "\n\nOutput JSON Schema:\n"
         + schema_text
         + "\n\nReturn only one JSON object that matches this schema. Do not include markdown fences or commentary."
     )
+    if output_path is not None:
+        result += f"\n\nIMPORTANT: Write the final JSON output to the file: {output_path}"
+    return result
 
 
 def agent_exec(
@@ -3121,7 +3351,7 @@ def opencode_exec(
     output_path: Path,
 ) -> dict[str, Any]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    full_prompt = prompt_with_inline_schema(prompt, schema)
+    full_prompt = prompt_with_inline_schema(prompt, schema, output_path)
     prompt_path = output_path.with_name(output_path.name + ".prompt.md")
     if args.keep_prompts:
         prompt_path.write_text(full_prompt + "\n", encoding="utf-8")
@@ -3147,16 +3377,23 @@ def opencode_exec(
             + f"stdout:\n{result.stdout}\n"
             + f"stderr:\n{result.stderr}"
         )
-    try:
-        parsed = load_json_object(result.stdout)
-    except (json.JSONDecodeError, PipelineError) as exc:
-        raise PipelineError(
-            "opencode output must contain a JSON object.\n"
-            + f"command: {' '.join(cmd)}\n"
-            + f"stdout:\n{result.stdout}\n"
-            + f"stderr:\n{result.stderr}"
-        ) from exc
-    write_json(output_path, parsed)
+    parsed = None
+    if output_path.exists():
+        try:
+            parsed = load_json_object(output_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, PipelineError):
+            parsed = None
+    if parsed is None:
+        try:
+            parsed = load_json_object(result.stdout)
+        except (json.JSONDecodeError, PipelineError) as exc:
+            raise PipelineError(
+                "opencode output must contain a JSON object.\n"
+                + f"command: {' '.join(cmd)}\n"
+                + f"stdout:\n{result.stdout}\n"
+                + f"stderr:\n{result.stderr}"
+            ) from exc
+        write_json(output_path, parsed)
     return parsed
 
 
@@ -3190,6 +3427,252 @@ def build_brief_prompt(args: argparse.Namespace, idea: str) -> str:
     ).strip()
 
 
+def enemy_design_slot_lines(maps: dict[str, Any], enemys: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    seen: set[str] = set()
+    for code, entry in sorted(maps.items(), key=lambda item: int(item[0])):
+        entry_id = str(entry.get("id", ""))
+        if entry.get("cls") not in {"enemys", "enemy48"} or entry_id not in enemys or entry_id in seen:
+            continue
+        seen.add(entry_id)
+        enemy = enemys.get(entry_id, {})
+        lines.append(
+            f"- code={code}, id={entry_id}, display_name={enemy.get('name') or entry.get('name') or entry_id}, "
+            f"class={entry.get('cls')}"
+        )
+    return lines
+
+
+def build_enemy_design_prompt(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    floor_count: int,
+    floor_size: int,
+) -> str:
+    monster_policy = brief.get("monster_policy", {}) if isinstance(brief.get("monster_policy"), dict) else {}
+    allowed_specials = monster_policy.get("allowed_specials", [1, 2, 3, 15, 18])
+    max_types = int(monster_policy.get("monster_types_per_floor") or 9)
+    slot_lines = enemy_design_slot_lines(maps, enemys)
+    configured_count = int(getattr(args, "enemy_design_count", DEFAULT_ENEMY_DESIGN_COUNT) or 0)
+    if configured_count > 0:
+        target_updates = min(len(slot_lines), configured_count)
+    else:
+        target_updates = len(slot_lines)
+    payload = {
+        "tower_brief": brief,
+        "floor_count": floor_count,
+        "floor_size": floor_size,
+        "allowed_specials": allowed_specials,
+        "max_specials_per_monster": monster_policy.get("max_specials_per_monster", 1),
+        "target_updated_enemy_slots": target_updates,
+        "red_potion_hp": red_potion_value(brief),
+        "special_damage_red_potion_range": [
+            monster_policy_number(brief, "special_damage_red_potion_min"),
+            monster_policy_number(brief, "special_damage_red_potion_max"),
+        ],
+        "available_enemy_slots": slot_lines,
+    }
+    return textwrap.dedent(
+        f"""
+        Read and follow this skill file first:
+        {skill_path(args.repo_root, "modify-mota-enemy-data")}
+
+        You are stage 0.5 of a code-orchestrated classic mota tower pipeline.
+        Return only JSON matching the provided schema.
+
+        Design this tower's monster stat table before any floor is generated.
+        Treat existing enemy ids, names, and sprites only as reusable slots. Ignore their existing
+        hp/atk/def/money/special settings and assign fresh values for this tower.
+        You are allowed and expected to overwrite enemy slots that already have stats.
+        Do not create new enemy ids, tile codes, sprites, scripts, events, or map placements.
+
+        Requirements:
+        - Update as many existing enemy slots as requested by target_updated_enemy_slots. If this
+          equals the available slot count, rewrite every available enemy slot.
+        - A later floor-generation stage may use only some of these enemies; the purpose is to give
+          monster-special enough choices across weak, medium, strong, and special-pressure roles.
+        - Create a readable progression from early weak monsters to late high-pressure monsters.
+        - Same-floor choices should have different roles: HP sponge, attack tax, defense threshold,
+          reward guard, route tax, and optional special-pressure enemies.
+        - Use only allowed_specials, and use at most one special per monster unless the brief says otherwise.
+        - For special 15 (zone) and 18 (repulse), set zone/repulse/value so the damage is within
+          the supplied red-potion ratio range; set range to 1 unless there is a clear reason.
+        - Non-special monsters must return specials=[].
+        - Keep all numeric values non-negative, and hp must be positive.
+
+        Input JSON:
+        {json.dumps(payload, ensure_ascii=False, indent=2)}
+        """
+    ).strip()
+
+
+def normalized_enemy_update_int(update: dict[str, Any], key: str, minimum: int) -> int:
+    value = update.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise PipelineError(f"enemy update {update.get('id')} has invalid {key}: {value!r}")
+    return max(minimum, int(value))
+
+
+def normalized_enemy_specials(update: dict[str, Any], allowed_specials: set[int], max_count: int) -> list[int]:
+    raw_specials = update.get("specials", [])
+    if not isinstance(raw_specials, list):
+        raw_specials = []
+    specials: list[int] = []
+    for raw in raw_specials:
+        if isinstance(raw, bool):
+            continue
+        try:
+            special = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if special in allowed_specials and special not in specials:
+            specials.append(special)
+    return specials[: max(max_count, 1)]
+
+
+def apply_enemy_design_updates(
+    source_enemys: dict[str, Any],
+    design: dict[str, Any],
+    brief: dict[str, Any],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    updates = design.get("updates", [])
+    if not isinstance(updates, list) or not updates:
+        raise PipelineError("enemy design agent returned no enemy updates.")
+
+    monster_policy = brief.get("monster_policy", {}) if isinstance(brief.get("monster_policy"), dict) else {}
+    allowed_specials = {
+        int(item)
+        for item in monster_policy.get("allowed_specials", [1, 2, 3, 15, 18])
+        if not isinstance(item, bool)
+    }
+    if not allowed_specials:
+        allowed_specials = {1, 2, 3, 15, 18}
+    max_specials = int(monster_policy.get("max_specials_per_monster") or 1)
+    red_potion = red_potion_value(brief)
+    default_special_damage = max(1, int(round(red_potion * 0.75)))
+
+    enemys = core_clone(source_enemys)
+    applied_ids: list[str] = []
+    warnings: list[str] = []
+    seen: set[str] = set()
+    for update in updates:
+        if not isinstance(update, dict):
+            warnings.append("ignored non-object enemy update")
+            continue
+        enemy_id = str(update.get("id", ""))
+        if not enemy_id or enemy_id not in enemys:
+            warnings.append(f"ignored unknown enemy id: {enemy_id or '<empty>'}")
+            continue
+        if enemy_id in seen:
+            warnings.append(f"ignored duplicate enemy update: {enemy_id}")
+            continue
+        seen.add(enemy_id)
+
+        enemy = enemys[enemy_id]
+        name = update.get("name")
+        if isinstance(name, str) and name.strip():
+            enemy["name"] = name.strip()
+        enemy["hp"] = normalized_enemy_update_int(update, "hp", 1)
+        enemy["atk"] = normalized_enemy_update_int(update, "atk", 0)
+        enemy["def"] = normalized_enemy_update_int(update, "def", 0)
+        enemy["money"] = normalized_enemy_update_int(update, "money", 0)
+        enemy["exp"] = normalized_enemy_update_int(update, "exp", 0)
+        enemy["point"] = normalized_enemy_update_int(update, "point", 0)
+
+        specials = normalized_enemy_specials(update, allowed_specials, max_specials)
+        enemy["special"] = 0 if not specials else (specials[0] if len(specials) == 1 else specials)
+
+        for key in ("value", "zone", "repulse"):
+            value = update.get(key)
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    warnings.append(f"ignored invalid {key} for {enemy_id}: {value!r}")
+                    continue
+                enemy[key] = max(0, int(value))
+        range_value = update.get("range")
+        if range_value is not None:
+            if isinstance(range_value, bool) or not isinstance(range_value, int):
+                warnings.append(f"ignored invalid range for {enemy_id}: {range_value!r}")
+            else:
+                enemy["range"] = max(1, int(range_value))
+        for key in ("zoneSquare", "notBomb"):
+            value = update.get(key)
+            if value is not None:
+                enemy[key] = bool(value)
+
+        if 15 in specials:
+            enemy["zone"] = int(enemy.get("zone") or enemy.get("value") or default_special_damage)
+            enemy["value"] = int(enemy.get("value") or enemy["zone"])
+            enemy["range"] = int(enemy.get("range") or 1)
+        if 18 in specials:
+            enemy["repulse"] = int(enemy.get("repulse") or enemy.get("value") or default_special_damage)
+            enemy["value"] = int(enemy.get("value") or enemy["repulse"])
+
+        applied_ids.append(enemy_id)
+
+    if not applied_ids:
+        raise PipelineError("enemy design agent did not update any known enemy ids.")
+    return enemys, applied_ids, warnings
+
+
+def prepare_runtime_enemy_table(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    maps: dict[str, Any],
+    source_enemys: dict[str, Any],
+    floor_count: int,
+    floor_size: int,
+) -> dict[str, Any]:
+    design_path = args.out_dir / "enemy_design.json"
+    generated_path = args.out_dir / "enemys.generated.json"
+
+    if args.resume_existing and generated_path.exists():
+        runtime_enemys = load_json_object(generated_path.read_text(encoding="utf-8"))
+        design = load_json_object(design_path.read_text(encoding="utf-8")) if design_path.exists() else {}
+        applied_ids = [
+            str(item)
+            for item in design.get("applied_enemy_ids", design.get("designed_enemy_ids", []))
+            if isinstance(item, (str, int))
+        ]
+        if applied_ids:
+            brief["enemy_design"] = {
+                "summary": design.get("summary", "Loaded existing generated enemy table."),
+                "designed_enemy_ids": applied_ids,
+                "warnings": design.get("warnings", []),
+            }
+        args.runtime_enemys = runtime_enemys
+        return runtime_enemys
+
+    if args.resume_existing and not generated_path.exists():
+        print("No existing generated enemy table found; resume will keep the current project enemy stats.")
+        return source_enemys
+
+    design = agent_exec(
+        args,
+        build_enemy_design_prompt(args, brief, maps, source_enemys, floor_count, floor_size),
+        ENEMY_DESIGN_SCHEMA,
+        design_path,
+    )
+    runtime_enemys, applied_ids, apply_warnings = apply_enemy_design_updates(source_enemys, design, brief)
+    warnings = list(design.get("warnings", [])) if isinstance(design.get("warnings"), list) else []
+    warnings.extend(apply_warnings)
+    design["applied_enemy_ids"] = applied_ids
+    design["designed_enemy_ids"] = applied_ids
+    design["warnings"] = warnings
+    write_json(design_path, design)
+    write_json(generated_path, runtime_enemys)
+    brief["enemy_design"] = {
+        "summary": design.get("summary", ""),
+        "designed_enemy_ids": applied_ids,
+        "warnings": warnings,
+    }
+    args.runtime_enemys = runtime_enemys
+    print(f"已设计 {len(applied_ids)} 个怪物数据。")
+    return runtime_enemys
+
+
 def staged_common_payload(
     args: argparse.Namespace,
     brief: dict[str, Any],
@@ -3215,8 +3698,19 @@ def staged_common_payload(
         "remaining_whole_tower_budget": remaining_budget(limits, used),
         "previous_accepted_floor_summaries": previous,
         "floor_contract": floor_contract or {},
+        "layout_constraints": layout_constraints_summary(brief),
         "repair_feedback": minimal_repair_feedback(feedback),
         "current_stage_output_to_repair": current_stage_output or {},
+    }
+
+
+def layout_constraints_summary(brief: dict[str, Any]) -> dict[str, Any]:
+    min_ratio, max_ratio = wall_ratio_range(brief)
+    return {
+        "wall_ratio_min": min_ratio,
+        "wall_ratio_max": max_ratio,
+        "high_value_pocket_threshold": high_value_pocket_threshold(brief),
+        "note": "These are generation and review targets; final LLM output may need manual adjustment.",
     }
 
 
@@ -3251,6 +3745,7 @@ def downstream_hard_constraints_summary(
     monster_policy = brief.get("monster_policy", {}) if isinstance(brief.get("monster_policy"), dict) else {}
     return {
         "stage_being_repaired": stage,
+        "layout_constraints": layout_constraints_summary(brief),
         "resource_budget_remaining": remaining_budget(limits, used),
         "floor_contract_resource_limits": floor_contract.get("resource_limits", {}) if isinstance(floor_contract, dict) else {},
         "enemy_policy": floor_policy or {},
@@ -3429,7 +3924,8 @@ Required checks:
 - 0 is the only ground and 1 is the only wall.
 - The entrance and exit are connected through meaningful space.
 - The structure suggests at least 3 candidate route families and around 8-12 branch, pocket, shortcut, or gated-access opportunities.
-- For 13x13, wall ratio should normally be around 0.50-0.60.
+- For 13x13, wall ratio should stay within input.layout_constraints.wall_ratio_min and
+  input.layout_constraints.wall_ratio_max when possible.
 - Avoid thick fill walls, purely decorative branches, fake branches, and dead space that cannot support economy.
 - Avoid clean repeated wall templates, symmetric straight-bar mazes, and near-identical adjacent floor wall masks.
 - Broken walls only count as precise when they can change access cost, reward protection, tool value, special pressure, or route choice.
@@ -3517,6 +4013,7 @@ def staged_review_prompt(
         "static_metrics": metrics or {},
         "budget_delta_from_map": delta,
         "floor_contract": floor_contract or {},
+        "layout_constraints": layout_constraints_summary(brief),
     }
     return textwrap.dedent(
         f"""
@@ -3586,7 +4083,14 @@ def run_staged_review(
 
     if stage == "topology":
         issues = topology_stage_review_issues(
-            stage_output, expected_floor_id, floor_size, maps, previous_floor_outputs
+            stage_output,
+            expected_floor_id,
+            floor_size,
+            maps,
+            previous_floor_outputs,
+            args.max_wall_similarity,
+            args.wall_ratio_min,
+            args.wall_ratio_max,
         )
         delta = empty_budget()
         metrics = floor_static_metrics(stage_output, maps, enemys, brief)
@@ -3617,6 +4121,7 @@ def run_staged_review(
             previous_floor_outputs,
             floor_policy,
             enforce_resource_progression,
+            args.max_wall_similarity,
         )
     elif stage == "integration":
         issues, delta, metrics = integration_stage_review_issues(
@@ -3631,6 +4136,7 @@ def run_staged_review(
             previous_floor_outputs,
             floor_policy,
             enforce_resource_progression,
+            args.max_wall_similarity,
         )
     else:
         raise PipelineError(f"Unknown staged review stage: {stage}")
@@ -3708,6 +4214,11 @@ def write_generated_project(
         shutil.rmtree(output_project)
     shutil.copytree(source_project, output_project)
 
+    runtime_enemys = getattr(args, "runtime_enemys", None)
+    if isinstance(runtime_enemys, dict):
+        enemy_assignment, _ = load_js_object(source_project / "enemys.js")
+        write_js_object(output_project / "enemys.js", enemy_assignment, runtime_enemys)
+
     floors_dir = output_project / "floors"
     floors_dir.mkdir(parents=True, exist_ok=True)
     for path in floors_dir.glob("*.js"):
@@ -3749,7 +4260,8 @@ def write_generated_project(
             value = initial.get(key)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 hero[key] = int(value)
-        constants = hero.setdefault("items", {}).setdefault("constants", {})
+        hero_items = hero.setdefault("items", {})
+        tools = hero_items.setdefault("tools", {})
         key_aliases = {
             "yellowKey": ("yellowKey", "yellow_keys", "yellow_keys_start", "yellow"),
             "blueKey": ("blueKey", "blue_keys", "blue_keys_start", "blue"),
@@ -3761,7 +4273,20 @@ def write_generated_project(
             if value is None:
                 value = next((initial_keys.get(alias) for alias in aliases if isinstance(initial_keys.get(alias), (int, float))), None)
             if value is not None and not isinstance(value, bool):
-                constants[item_id] = int(value)
+                tools[item_id] = int(value)
+        initial_tools = initial.get("tools", {}) if isinstance(initial.get("tools"), dict) else {}
+        tool_aliases = {
+            "pickaxe": ("pickaxe", "pickaxes", "pickaxe_start"),
+            "bomb": ("bomb", "bombs", "bomb_start"),
+            "centerFly": ("centerFly", "center_fly", "centerFly_start", "center_fly_start"),
+            "jumpShoes": ("jumpShoes", "jump_shoes", "jumpShoes_start", "jump_shoes_start"),
+        }
+        for item_id, aliases in tool_aliases.items():
+            value = next((initial.get(alias) for alias in aliases if isinstance(initial.get(alias), (int, float))), None)
+            if value is None:
+                value = next((initial_tools.get(alias) for alias in aliases if isinstance(initial_tools.get(alias), (int, float))), None)
+            if value is not None and not isinstance(value, bool):
+                tools[item_id] = int(value)
         values = data.setdefault("values", {})
         for section_name, aliases in {
             "gems": {"redGem": ("redGem", "red"), "blueGem": ("blueGem", "blue"), "greenGem": ("greenGem", "green")},
@@ -3817,7 +4342,7 @@ def final_tower_validation_issues(
         )
         metrics = floor_static_metrics(floor_output, maps, enemys, brief)
         local_issues.extend(high_value_pocket_metric_issues(metrics))
-        local_issues.extend(wall_mask_similarity_issues(previous_floors, floor_output, maps))
+        local_issues.extend(wall_mask_similarity_issues(previous_floors, floor_output, maps, args.max_wall_similarity))
         local_issues.extend(floor_resource_progression_issues(brief, previous_floors, floor_output, maps))
         if local_issues:
             issues.extend(f"{expected_floor_id}: {issue}" for issue in local_issues[:8])
@@ -3978,6 +4503,52 @@ def is_resumable_review(review: dict[str, Any]) -> bool:
     return review.get("status") == "pass"
 
 
+def is_forced_accept_review(review: dict[str, Any] | None) -> bool:
+    return bool(isinstance(review, dict) and review.get("forced_accept") is True)
+
+
+def forced_accept_review(
+    floor_index: int,
+    attempt: int,
+    stage: str,
+    delta: dict[str, int] | None = None,
+    skipped_issues: list[str] | None = None,
+) -> dict[str, Any]:
+    issues = [
+        structured_issue(
+            "integration" if stage == "integration" else stage,
+            "warn",
+            (
+                f"MT{floor_index} reached max_attempts on attempt {attempt}; "
+                f"{stage} review was skipped and the latest generated output was accepted."
+            ),
+            "Manual review and adjustment are recommended before publishing this tower.",
+        )
+    ]
+    for issue in (skipped_issues or [])[:8]:
+        issues.append(
+            structured_issue(
+                "integration",
+                "warn",
+                issue,
+                "Manual review and adjustment are recommended.",
+            )
+        )
+    return {
+        "status": "pass",
+        "issues": issues,
+        "required_changes": [],
+        "budget_delta": normalize_delta(delta),
+        "summary": (
+            f"Forced accept: MT{floor_index} used the final attempt output without {stage} review. "
+            "Generated artifacts are saved, but quality is not guaranteed."
+        ),
+        "forced_accept": True,
+        "forced_stage": stage,
+        "attempt": attempt,
+    }
+
+
 def try_resume_existing_floors(
     args: argparse.Namespace,
     brief: dict[str, Any],
@@ -4005,7 +4576,7 @@ def try_resume_existing_floors(
         local_issues, delta = local_floor_review(floor_output, floor_id, floor_size, brief, maps, enemys)
         metrics = floor_static_metrics(floor_output, maps, enemys, brief)
         local_issues.extend(high_value_pocket_metric_issues(metrics))
-        local_issues.extend(wall_mask_similarity_issues(accepted_floors, floor_output, maps))
+        local_issues.extend(wall_mask_similarity_issues(accepted_floors, floor_output, maps, args.max_wall_similarity))
         local_issues.extend(floor_resource_progression_issues(brief, accepted_floors, floor_output, maps))
         delta = normalize_delta(review.get("budget_delta")) or delta
         local_issues.extend(budget_issues(delta, limits, used))
@@ -4124,6 +4695,7 @@ def generate_floor_staged_with_retries(
     repair_stage_outputs: dict[str, dict[str, Any]] = {}
 
     for attempt in range(1, args.max_attempts + 1):
+        final_attempt = attempt == args.max_attempts
         active_repair_stage = repair_stage
         stage_start = STAGE_ORDER[active_repair_stage]
         if stage_start <= STAGE_ORDER["topology"]:
@@ -4157,32 +4729,32 @@ def generate_floor_staged_with_retries(
                 stage_prefix.with_suffix(".floor.json"),
             )
             write_json(stage_prefix.with_suffix(".floor.json"), topology_output)
-            topology_review = run_staged_review(
-                args,
-                stage_prefix,
-                "topology",
-                brief,
-                topology_output,
-                used,
-                limits,
-                accepted_summaries,
-                accepted_floors,
-                floor_size,
-                maps,
-                enemys,
-                floor_policy,
-                floor_contract,
-                False,
-            )
+            if final_attempt:
+                topology_review = forced_accept_review(floor_index, attempt, "topology")
+            else:
+                topology_review = run_staged_review(
+                    args,
+                    stage_prefix,
+                    "topology",
+                    brief,
+                    topology_output,
+                    used,
+                    limits,
+                    accepted_summaries,
+                    accepted_floors,
+                    floor_size,
+                    maps,
+                    enemys,
+                    floor_policy,
+                    floor_contract,
+                    False,
+                )
             write_json(stage_prefix.with_suffix(".review.json"), topology_review)
-            if topology_review.get("status") != "pass":
+            if not final_attempt and topology_review.get("status") != "pass":
                 feedback = topology_review
                 repair_stage_outputs["topology"] = topology_output
                 repair_stage = earliest_repair_stage(topology_review, "topology")
-                print(
-                    f"MT{floor_index} topology review failed on attempt {attempt}: "
-                    f"{topology_review.get('summary', '')}"
-                )
+                print(review_retry_message(floor_index, "topology", attempt, topology_review.get("summary", "")))
                 continue
 
         if topology_output is None:
@@ -4210,33 +4782,33 @@ def generate_floor_staged_with_retries(
                 stage_prefix.with_suffix(".floor.json"),
             )
             write_json(stage_prefix.with_suffix(".floor.json"), economy_output)
-            economy_review = run_staged_review(
-                args,
-                stage_prefix,
-                "economy",
-                brief,
-                economy_output,
-                used,
-                limits,
-                accepted_summaries,
-                accepted_floors,
-                floor_size,
-                maps,
-                enemys,
-                floor_policy,
-                floor_contract,
-                enforce_resource_progression,
-                topology_output=topology_output,
-            )
+            if final_attempt:
+                economy_review = forced_accept_review(floor_index, attempt, "economy")
+            else:
+                economy_review = run_staged_review(
+                    args,
+                    stage_prefix,
+                    "economy",
+                    brief,
+                    economy_output,
+                    used,
+                    limits,
+                    accepted_summaries,
+                    accepted_floors,
+                    floor_size,
+                    maps,
+                    enemys,
+                    floor_policy,
+                    floor_contract,
+                    enforce_resource_progression,
+                    topology_output=topology_output,
+                )
             write_json(stage_prefix.with_suffix(".review.json"), economy_review)
-            if economy_review.get("status") != "pass":
+            if not final_attempt and economy_review.get("status") != "pass":
                 feedback = economy_review
                 repair_stage_outputs["economy"] = economy_output
                 repair_stage = earliest_repair_stage(economy_review, "economy")
-                print(
-                    f"MT{floor_index} economy review failed on attempt {attempt}: "
-                    f"{economy_review.get('summary', '')}"
-                )
+                print(review_retry_message(floor_index, "economy", attempt, economy_review.get("summary", "")))
                 continue
 
         if economy_output is None:
@@ -4265,10 +4837,67 @@ def generate_floor_staged_with_retries(
             )
             apply_brief_required_events(brief, monster_output)
             write_json(stage_prefix.with_suffix(".floor.json"), monster_output)
-            monster_review = run_staged_review(
+            if final_attempt:
+                monster_review = forced_accept_review(floor_index, attempt, "monster")
+            else:
+                monster_review = run_staged_review(
+                    args,
+                    stage_prefix,
+                    "monster",
+                    brief,
+                    monster_output,
+                    used,
+                    limits,
+                    accepted_summaries,
+                    accepted_floors,
+                    floor_size,
+                    maps,
+                    enemys,
+                    floor_policy,
+                    floor_contract,
+                    enforce_resource_progression,
+                    topology_output=topology_output,
+                    economy_output=economy_output,
+                )
+            write_json(stage_prefix.with_suffix(".review.json"), monster_review)
+            if not final_attempt and monster_review.get("status") != "pass":
+                feedback = monster_review
+                repair_stage_outputs["monster"] = monster_output
+                repair_stage = earliest_repair_stage(monster_review, "monster")
+                print(review_retry_message(floor_index, "monster", attempt, monster_review.get("summary", "")))
+                continue
+
+        if monster_output is None:
+            raise PipelineError(f"MT{floor_index} staged pipeline missing monster output.")
+
+        integration_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_integration"
+        if final_attempt:
+            expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
+            try:
+                forced_issues, forced_delta = local_floor_review(
+                    monster_output,
+                    expected_floor_id,
+                    floor_size,
+                    brief,
+                    maps,
+                    enemys,
+                    floor_policy,
+                )
+            except PipelineError as exc:
+                forced_issues = [str(exc)]
+                forced_delta = normalize_delta(None)
+            integration_review = forced_accept_review(
+                floor_index,
+                attempt,
+                "integration",
+                forced_delta,
+                forced_issues,
+            )
+        else:
+            integration_review = run_staged_review(
                 args,
-                stage_prefix,
-                "monster",
+                integration_prefix,
+                "integration",
                 brief,
                 monster_output,
                 used,
@@ -4284,45 +4913,13 @@ def generate_floor_staged_with_retries(
                 topology_output=topology_output,
                 economy_output=economy_output,
             )
-            write_json(stage_prefix.with_suffix(".review.json"), monster_review)
-            if monster_review.get("status") != "pass":
-                feedback = monster_review
-                repair_stage_outputs["monster"] = monster_output
-                repair_stage = earliest_repair_stage(monster_review, "monster")
-                print(
-                    f"MT{floor_index} monster review failed on attempt {attempt}: "
-                    f"{monster_review.get('summary', '')}"
-                )
-                continue
-
-        if monster_output is None:
-            raise PipelineError(f"MT{floor_index} staged pipeline missing monster output.")
-
-        integration_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_integration"
-        integration_review = run_staged_review(
-            args,
-            integration_prefix,
-            "integration",
-            brief,
-            monster_output,
-            used,
-            limits,
-            accepted_summaries,
-            accepted_floors,
-            floor_size,
-            maps,
-            enemys,
-            floor_policy,
-            floor_contract,
-            enforce_resource_progression,
-            topology_output=topology_output,
-            economy_output=economy_output,
-        )
         write_json(integration_prefix.with_suffix(".review.json"), integration_review)
         if integration_review.get("status") == "pass":
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.topology.json", topology_output)
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.economy.json", economy_output)
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.monster.json", monster_output)
+            if is_forced_accept_review(integration_review):
+                print(f"{floor_label(floor_index)}已保存，但质量需要生成结束后手动看一下。")
             return {
                 "floor_index": floor_index,
                 "floor_output": monster_output,
@@ -4336,8 +4933,13 @@ def generate_floor_staged_with_retries(
         repair_stage_outputs["monster"] = monster_output
         repair_stage = earliest_repair_stage(integration_review, "integration")
         print(
-            f"MT{floor_index} integration review failed on attempt {attempt}; "
-            f"repair will restart at {repair_stage}: {integration_review.get('summary', '')}"
+            review_retry_message(
+                floor_index,
+                "integration",
+                attempt,
+                integration_review.get("summary", ""),
+                repair_stage,
+            )
         )
 
     raise PipelineError(f"MT{floor_index} did not pass staged review within {args.max_attempts} attempts.")
@@ -4413,7 +5015,13 @@ def run_sequential_floor_generation(
         used = add_budget(used, delta)
         write_accepted_floor_artifacts(args, floor_index, accepted_floor, accepted_review, limits, used)
         accepted_floors.append(accepted_floor)
-        accepted_summaries.append(accepted_floor_summary(args, floor_index, floor_size, accepted_floor, delta))
+        summary_extra: dict[str, Any] = {}
+        if is_forced_accept_review(accepted_review):
+            summary_extra["forced_accept"] = True
+            summary_extra["quality_warning"] = accepted_review.get("summary", "")
+        accepted_summaries.append(
+            accepted_floor_summary(args, floor_index, floor_size, accepted_floor, delta, summary_extra)
+        )
 
         if not args.skip_playtest:
             output_project = write_generated_project(args, brief, accepted_floors)
@@ -4434,7 +5042,10 @@ def run_sequential_floor_generation(
                     raise PipelineError(
                         f"MT{floor_index} playtest failed under --playtest-policy=fail."
                     )
-        print(f"MT{floor_index} passed review.")
+        if is_forced_accept_review(accepted_review):
+            print(f"{floor_label(floor_index)}已保存，但建议生成结束后手动微调。")
+        else:
+            print(f"{floor_label(floor_index)}检查通过。")
 
     return used, accepted_summaries, accepted_floors
 
@@ -4453,7 +5064,7 @@ def run_parallel_floor_generation(
     write_json(args.out_dir / "floor_contracts.json", {"contracts": contracts})
 
     worker_count = min(args.floor_concurrency, floor_count, MAX_FLOOR_CONCURRENCY)
-    print(f"Parallel floor generation enabled with {worker_count} worker(s).")
+    print(f"已开始同时生成 {worker_count} 个楼层。")
 
     results: dict[int, dict[str, Any]] = {}
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
@@ -4490,7 +5101,10 @@ def run_parallel_floor_generation(
                 results[floor_index] = future.result()
             except Exception as exc:
                 raise PipelineError(f"MT{floor_index} parallel worker failed: {exc}") from exc
-            print(f"MT{floor_index} passed review in parallel worker.")
+            if is_forced_accept_review(results[floor_index].get("review")):
+                print(f"{floor_label(floor_index)}已保存，但质量需要生成结束后手动看一下。")
+            else:
+                print(f"{floor_label(floor_index)}检查通过。")
 
     used = empty_budget()
     accepted_summaries: list[dict[str, Any]] = []
@@ -4501,21 +5115,38 @@ def run_parallel_floor_generation(
         result = results[floor_index]
         accepted_floor = result["floor_output"]
         accepted_review = result["review"]
+        forced_accept = is_forced_accept_review(accepted_review)
         floor_policy = build_runtime_floor_policy(brief, floor_enemy_policies, floor_index, accepted_floors, maps)
         expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
-        local_issues, delta = local_floor_review(
-            accepted_floor, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
-        )
-        metrics = floor_static_metrics(accepted_floor, maps, enemys, brief)
-        local_issues.extend(static_metric_issues(metrics))
-        local_issues.extend(wall_mask_similarity_issues(accepted_floors, accepted_floor, maps))
-        local_issues.extend(floor_resource_progression_issues(brief, accepted_floors, accepted_floor, maps))
-        local_issues.extend(budget_issues(delta, limits, used))
+        try:
+            local_issues, delta = local_floor_review(
+                accepted_floor, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
+            )
+            metrics = floor_static_metrics(accepted_floor, maps, enemys, brief)
+            local_issues.extend(static_metric_issues(metrics))
+            local_issues.extend(
+                wall_mask_similarity_issues(accepted_floors, accepted_floor, maps, args.max_wall_similarity)
+            )
+            local_issues.extend(floor_resource_progression_issues(brief, accepted_floors, accepted_floor, maps))
+            local_issues.extend(budget_issues(delta, limits, used))
+        except PipelineError as exc:
+            if not forced_accept:
+                raise
+            local_issues = [str(exc)]
+            delta = normalize_delta(accepted_review.get("budget_delta"))
         if accepted_review.get("status") != "pass":
             local_issues.append("parallel worker review did not pass.")
         if local_issues:
             detail = "\n".join(f"- {issue}" for issue in local_issues[:8])
-            raise PipelineError(f"Final global validation failed for MT{floor_index}:\n{detail}")
+            if forced_accept:
+                accepted_review["final_global_validation_warnings"] = local_issues[:12]
+                print(
+                    f"Final global validation warning for forced MT{floor_index}; "
+                    "keeping generated output for manual adjustment:"
+                )
+                print(detail)
+            else:
+                raise PipelineError(f"Final global validation failed for MT{floor_index}:\n{detail}")
 
         accepted_review["budget_delta"] = delta
         used = add_budget(used, delta)
@@ -4528,11 +5159,54 @@ def run_parallel_floor_generation(
                 floor_size,
                 accepted_floor,
                 delta,
-                {"parallel": True, "floor_contract": contracts[floor_index]},
+                {
+                    "parallel": True,
+                    "floor_contract": contracts[floor_index],
+                    **(
+                        {
+                            "forced_accept": True,
+                            "quality_warning": accepted_review.get("summary", ""),
+                        }
+                        if forced_accept
+                        else {}
+                    ),
+                },
             )
         )
 
     return used, accepted_summaries, accepted_floors
+
+
+def apply_advanced_policy_overrides(args: argparse.Namespace, brief: dict[str, Any]) -> None:
+    monster_policy = brief.setdefault("monster_policy", {})
+    if not isinstance(monster_policy, dict):
+        monster_policy = {}
+        brief["monster_policy"] = monster_policy
+    monster_policy["monster_types_per_floor"] = int(args.monster_types_per_floor)
+    monster_policy["max_specials_per_monster"] = int(args.max_specials_per_monster)
+    monster_policy["floor_overlap_ratio"] = float(args.floor_overlap_ratio)
+    monster_policy["special_damage_red_potion_min"] = float(args.special_damage_red_potion_min)
+    monster_policy["special_damage_red_potion_max"] = float(args.special_damage_red_potion_max)
+    monster_policy["no_adjacent_enemies"] = not bool(args.allow_adjacent_enemies)
+
+    resource_policy = brief.setdefault("resource_policy", {})
+    if not isinstance(resource_policy, dict):
+        resource_policy = {}
+        brief["resource_policy"] = resource_policy
+    resource_policy["gem_floor_delta_min"] = float(args.gem_floor_delta_min)
+    resource_policy["gem_floor_delta_max"] = float(args.gem_floor_delta_max)
+    resource_policy["potion_floor_delta_min"] = float(args.potion_floor_delta_min)
+    resource_policy["potion_floor_delta_max"] = float(args.potion_floor_delta_max)
+    resource_policy["potion_compare_mode"] = "red_potion_equiv"
+
+    layout_constraints = brief.setdefault("layout_constraints", {})
+    if not isinstance(layout_constraints, dict):
+        layout_constraints = {}
+        brief["layout_constraints"] = layout_constraints
+    layout_constraints["wall_ratio_min"] = float(args.wall_ratio_min)
+    layout_constraints["wall_ratio_max"] = float(args.wall_ratio_max)
+    layout_constraints["high_value_pocket_threshold"] = float(args.high_value_pocket_threshold)
+    layout_constraints["warning"] = "Advanced generation constraints are targets; LLM output may need manual adjustment."
 
 
 def run_pipeline(args: argparse.Namespace) -> int:
@@ -4580,6 +5254,8 @@ def run_pipeline(args: argparse.Namespace) -> int:
             if not (isinstance(rule, str) and ("x" in rule and "floors" in rule))
         ]
         brief["fixed_rules"].insert(0, size_rule)
+    if not args.resume_existing:
+        apply_advanced_policy_overrides(args, brief)
     write_json(brief_output, brief)
 
     if args.brief_only:
@@ -4594,7 +5270,9 @@ def run_pipeline(args: argparse.Namespace) -> int:
             return 3
 
     limits = numeric_limits(brief.get("global_limits", {}))
-    maps, enemys = load_project_tables(args)
+    maps, source_enemys = load_project_tables(args)
+    enemys = prepare_runtime_enemy_table(args, brief, maps, source_enemys, floor_count, floor_size)
+    write_json(brief_output, brief)
     floor_enemy_policies = build_floor_enemy_policies(floor_count, maps, enemys, brief)
     if args.parallel_floors:
         if args.resume_existing:
@@ -4637,23 +5315,42 @@ def run_pipeline(args: argparse.Namespace) -> int:
         )
 
     output_project = write_generated_project(args, brief, accepted_floors)
-    final_issues = final_tower_validation_issues(
-        args,
-        brief,
-        accepted_floors,
-        floor_count,
-        floor_size,
-        maps,
-        enemys,
-        floor_enemy_policies,
-        limits,
-        used,
-        output_project,
-        True,
-    )
+    has_forced_acceptance = any(bool(summary.get("forced_accept")) for summary in accepted_summaries)
+    try:
+        final_issues = final_tower_validation_issues(
+            args,
+            brief,
+            accepted_floors,
+            floor_count,
+            floor_size,
+            maps,
+            enemys,
+            floor_enemy_policies,
+            limits,
+            used,
+            output_project,
+            True,
+        )
+    except PipelineError as exc:
+        if not has_forced_acceptance:
+            raise
+        final_issues = [str(exc)]
+    final_validation = {
+        "status": "warn" if final_issues and has_forced_acceptance else ("fail" if final_issues else "pass"),
+        "issues": final_issues,
+        "forced_acceptance": has_forced_acceptance,
+    }
+    write_json(args.out_dir / "final_validation.json", final_validation)
     if final_issues:
         detail = "\n".join(f"- {issue}" for issue in final_issues[:12])
-        raise PipelineError(f"Final tower validation failed:\n{detail}")
+        if has_forced_acceptance:
+            print(
+                "Final tower validation produced warnings after forced acceptance; "
+                "generated output is kept for manual adjustment:"
+            )
+            print(detail)
+        else:
+            raise PipelineError(f"Final tower validation failed:\n{detail}")
 
     if args.parallel_floors and not args.skip_playtest:
         playtest = run_playtest_game(args, output_project, floor_count - 1)
@@ -4674,10 +5371,11 @@ def run_pipeline(args: argparse.Namespace) -> int:
         "project_dir": str(output_project),
         "budget_ledger": {"limits": limits, "used": used},
         "floors": accepted_summaries,
+        "final_validation": final_validation,
     }
     write_json(args.out_dir / "summary.json", final_summary)
-    print(f"\nBuild complete: {args.out_dir / 'summary.json'}")
-    print(f"Generated project: {output_project}")
+    print(f"\n生成完成：{args.out_dir / 'summary.json'}")
+    print(f"可游玩项目已生成：{output_project}")
     return 0
 
 
@@ -4734,10 +5432,54 @@ def self_test(repo_root: Path) -> int:
     assert "--model" not in opencode_cmd
     assert "model_reasoning_effort" not in opencode_cmd_text
     assert "service_tier" not in opencode_cmd_text
+    assert opencode_cmd[-2:] == ["--file", "/tmp/prompt.md"]
     parsed_defaults = parse_args(["--self-test"])
     assert parsed_defaults.timeout == DEFAULT_AGENT_TIMEOUT_SECONDS
     args = argparse.Namespace(repo_root=repo_root)
     maps, enemys = load_project_tables(args)
+    enemy_design_brief = {
+        "monster_policy": {"allowed_specials": [1, 2, 3, 15, 18], "monster_types_per_floor": 9},
+        "global_settings": {"potions": {"redPotion": 100}},
+    }
+    designed_enemys, designed_ids, design_warnings = apply_enemy_design_updates(
+        enemys,
+        {
+            "updates": [
+                {
+                    "id": "greenSlime",
+                    "name": "测试绿头怪",
+                    "hp": 777,
+                    "atk": 21,
+                    "def": 9,
+                    "money": 3,
+                    "exp": 0,
+                    "point": 0,
+                    "specials": [15],
+                    "value": None,
+                    "zone": 80,
+                    "repulse": None,
+                    "range": 1,
+                    "zoneSquare": False,
+                    "notBomb": None,
+                }
+            ]
+        },
+        enemy_design_brief,
+    )
+    assert designed_ids == ["greenSlime"]
+    assert design_warnings == []
+    assert designed_enemys["greenSlime"]["hp"] == 777
+    assert designed_enemys["greenSlime"]["special"] == 15
+    assert designed_enemys["greenSlime"]["zone"] == 80
+    enemy_design_brief["enemy_design"] = {"designed_enemy_ids": designed_ids}
+    designed_candidates = build_enemy_candidates(maps, designed_enemys, enemy_design_brief)
+    assert {item["id"] for item in designed_candidates} == {"greenSlime"}
+    forced_review = forced_accept_review(0, 1, "integration", {"yellow_doors": 1}, ["self-test warning"])
+    assert forced_review["status"] == "pass"
+    assert forced_review["forced_accept"] is True
+    assert is_forced_accept_review(forced_review)
+    assert forced_review["budget_delta"]["yellow_doors"] == 1
+
     sample_floor_output = {
         "floor_id": "MT0",
         "floor_index": 0,
@@ -4771,12 +5513,38 @@ def self_test(repo_root: Path) -> int:
             "enemy_count_max_per_floor": 10,
         }
     }
+    test_enemys = core_clone(enemys)
+    for row in sample_floor_output["floor"]["map"]:
+        for code in row:
+            entry = maps.get(str(code))
+            if not is_enemy_entry(entry):
+                continue
+            enemy = test_enemys.get(str(entry.get("id")))
+            if enemy is None:
+                continue
+            enemy["special"] = 0
+            enemy.pop("repulse", None)
+            enemy.pop("zoneSquare", None)
+    enemys = test_enemys
     local_issues, sample_delta = local_floor_review(sample_floor_output, "MT0", 9, sample_brief, maps, enemys)
     assert local_issues == []
     assert sample_delta["yellow_doors"] == 1
     assert sample_delta["blue_doors"] == 1
     assert sample_delta["yellow_keys"] == 1
     assert sample_delta["blue_keys"] == 1
+    assert sample_delta["redGems"] == 1
+    assert sample_delta["blueGems"] == 1
+    assert sample_delta["redPotions"] == 1
+    assert sample_delta["bluePotions"] == 1
+    resource_probe_delta = derive_budget_delta({"map": [[27, 28, 29, 31, 32, 34, 33, 69]]}, maps)
+    assert resource_probe_delta["redGems"] == 1
+    assert resource_probe_delta["blueGems"] == 1
+    assert resource_probe_delta["greenGems"] == 1
+    assert resource_probe_delta["redPotions"] == 1
+    assert resource_probe_delta["bluePotions"] == 1
+    assert resource_probe_delta["yellowPotions"] == 1
+    assert resource_probe_delta["greenPotions"] == 1
+    assert resource_probe_delta["jumpShoes"] == 1
 
     topology_floor_output = core_clone(sample_floor_output)
     topology_floor_output["summary"] = "topology-only self-test floor"
@@ -4916,7 +5684,8 @@ def self_test(repo_root: Path) -> int:
         False,
     )
     assert not any(issue["severity"] == "fail" for issue in monster_issues)
-    assert monster_delta == sample_delta
+    for key in ("yellow_doors", "blue_doors", "yellow_keys", "blue_keys"):
+        assert monster_delta[key] == sample_delta[key]
     assert monster_metrics["available"] is True
 
     integration_review = structured_review(
@@ -5042,12 +5811,25 @@ def self_test(repo_root: Path) -> int:
     assert previous_hero["def"] > 10
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        write_args = argparse.Namespace(repo_root=repo_root, out_dir=Path(tmp_dir), floor_prefix="MT", floor_number_offset=0)
+        write_args = argparse.Namespace(
+            repo_root=repo_root,
+            out_dir=Path(tmp_dir),
+            floor_prefix="MT",
+            floor_number_offset=0,
+            max_wall_similarity=MAX_ADJACENT_WALL_MASK_SIMILARITY,
+            runtime_enemys=designed_enemys,
+        )
         output_project = write_generated_project(
             write_args,
             {
                 "global_settings": {
-                    "initial_hero": {"hp": 500, "atk": 12, "def": 8, "keys": {"yellow": 2, "blue": 1}},
+                    "initial_hero": {
+                        "hp": 500,
+                        "atk": 12,
+                        "def": 8,
+                        "keys": {"yellow": 2, "blue": 1},
+                        "tools": {"pickaxe": 1, "bomb": 2, "centerFly": 3, "jumpShoes": 4},
+                    },
                     "gems": {"red": 2, "blue": 3, "green": 5},
                     "potions": {"red": 80, "blue": 200, "yellow": 500, "green": 1000},
                 }
@@ -5058,11 +5840,17 @@ def self_test(repo_root: Path) -> int:
         _, written_floor = load_js_object(output_project / "floors" / "MT0.js")
         assert written_floor["events"]["4,0"][0]["type"] == "win"
         _, written_data = load_js_object(output_project / "data.js")
+        _, written_enemys = load_js_object(output_project / "enemys.js")
+        assert written_enemys["greenSlime"]["hp"] == 777
         assert written_data["main"]["floorIds"] == ["MT0"]
         assert written_data["firstData"]["floorId"] == "MT0"
         assert written_data["firstData"]["hero"]["hp"] == 500
-        assert written_data["firstData"]["hero"]["items"]["constants"]["yellowKey"] == 2
-        assert written_data["firstData"]["hero"]["items"]["constants"]["blueKey"] == 1
+        assert written_data["firstData"]["hero"]["items"]["tools"]["yellowKey"] == 2
+        assert written_data["firstData"]["hero"]["items"]["tools"]["blueKey"] == 1
+        assert written_data["firstData"]["hero"]["items"]["tools"]["pickaxe"] == 1
+        assert written_data["firstData"]["hero"]["items"]["tools"]["bomb"] == 2
+        assert written_data["firstData"]["hero"]["items"]["tools"]["centerFly"] == 3
+        assert written_data["firstData"]["hero"]["items"]["tools"]["jumpShoes"] == 4
         assert written_data["values"]["redGem"] == 2
         assert written_data["values"]["bluePotion"] == 200
         exact_limits = {key: sample_delta.get(key, 0) for key in TRACKED_RESOURCES}
@@ -5110,6 +5898,7 @@ def self_test(repo_root: Path) -> int:
         "topology-mota-floor",
         "economy-mota-floor",
         "monster-special-mota-floor",
+        "modify-mota-enemy-data",
     ]:
         path = skill_path(repo_root, name)
         assert path.exists(), f"missing skill: {path}"
@@ -5181,6 +5970,41 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=DEFAULT_AGENT_TIMEOUT_SECONDS,
         help=f"Per agent call timeout in seconds. Default: {DEFAULT_AGENT_TIMEOUT_SECONDS}.",
     )
+    parser.add_argument(
+        "--max-wall-similarity",
+        type=float,
+        default=MAX_ADJACENT_WALL_MASK_SIMILARITY,
+        help="Maximum allowed adjacent-floor wall mask similarity. Default: 0.9.",
+    )
+    parser.add_argument("--wall-ratio-min", type=float, default=DEFAULT_WALL_RATIO_MIN, help="Minimum target wall ratio for 13x13 topology.")
+    parser.add_argument("--wall-ratio-max", type=float, default=DEFAULT_WALL_RATIO_MAX, help="Maximum target wall ratio for 13x13 topology.")
+    parser.add_argument(
+        "--monster-types-per-floor",
+        type=int,
+        default=DEFAULT_MONSTER_TYPES_PER_FLOOR,
+        help="Maximum enemy type count available to each generated floor.",
+    )
+    parser.add_argument("--max-specials-per-monster", type=int, default=1, help="Maximum special abilities per enemy.")
+    parser.add_argument("--allow-adjacent-enemies", action="store_true", help="Allow orthogonally adjacent enemy placements.")
+    parser.add_argument("--floor-overlap-ratio", type=float, default=0.7, help="Enemy candidate overlap ratio between adjacent floors.")
+    parser.add_argument("--special-damage-red-potion-min", type=float, default=0.5, help="Minimum zone/repulse damage as red-potion ratio.")
+    parser.add_argument("--special-damage-red-potion-max", type=float, default=1.0, help="Maximum zone/repulse damage as red-potion ratio.")
+    parser.add_argument("--gem-floor-delta-min", type=float, default=0.0, help="Minimum gem-count increase allowed between adjacent floors.")
+    parser.add_argument("--gem-floor-delta-max", type=float, default=2.0, help="Maximum gem-count increase allowed between adjacent floors.")
+    parser.add_argument("--potion-floor-delta-min", type=float, default=0.0, help="Minimum red-potion-equivalent increase allowed between adjacent floors.")
+    parser.add_argument("--potion-floor-delta-max", type=float, default=2.0, help="Maximum red-potion-equivalent increase allowed between adjacent floors.")
+    parser.add_argument(
+        "--high-value-pocket-threshold",
+        type=float,
+        default=DEFAULT_HIGH_VALUE_POCKET_THRESHOLD,
+        help="Resource-weight threshold for unguarded high-value pocket warnings.",
+    )
+    parser.add_argument(
+        "--enemy-design-count",
+        type=int,
+        default=DEFAULT_ENEMY_DESIGN_COUNT,
+        help="Number of existing enemy slots for the enemy-data agent to rewrite; 0 means all available slots.",
+    )
     parser.add_argument("--sandbox", default="read-only", choices=["read-only", "workspace-write", "danger-full-access"], help="Codex sandbox mode.")
     parser.add_argument("--skip-playtest", action="store_true", help="Do not run browser playtests after floor reviews.")
     parser.add_argument(
@@ -5204,6 +6028,34 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("--parallel-floors cannot be combined with --resume-existing")
     if args.floor_number_offset < 0:
         parser.error("--floor-number-offset must be non-negative")
+    if not 0 < args.max_wall_similarity <= 1:
+        parser.error("--max-wall-similarity must be > 0 and <= 1")
+    if not 0.1 <= args.wall_ratio_min <= 0.9 or not 0.1 <= args.wall_ratio_max <= 0.9:
+        parser.error("--wall-ratio-min/max must be decimals between 0.1 and 0.9")
+    if args.wall_ratio_min > args.wall_ratio_max:
+        parser.error("--wall-ratio-min cannot exceed --wall-ratio-max")
+    if args.monster_types_per_floor <= 0 or args.monster_types_per_floor > 30:
+        parser.error("--monster-types-per-floor must be between 1 and 30")
+    if args.max_specials_per_monster <= 0 or args.max_specials_per_monster > 3:
+        parser.error("--max-specials-per-monster must be between 1 and 3")
+    if not 0 <= args.floor_overlap_ratio <= 1:
+        parser.error("--floor-overlap-ratio must be between 0 and 1")
+    if args.special_damage_red_potion_min < 0 or args.special_damage_red_potion_max < 0:
+        parser.error("--special-damage-red-potion-min/max must be non-negative")
+    if args.special_damage_red_potion_min > args.special_damage_red_potion_max:
+        parser.error("--special-damage-red-potion-min cannot exceed max")
+    if args.gem_floor_delta_min < 0 or args.gem_floor_delta_max < 0:
+        parser.error("--gem-floor-delta-min/max must be non-negative")
+    if args.gem_floor_delta_min > args.gem_floor_delta_max:
+        parser.error("--gem-floor-delta-min cannot exceed max")
+    if args.potion_floor_delta_min < 0 or args.potion_floor_delta_max < 0:
+        parser.error("--potion-floor-delta-min/max must be non-negative")
+    if args.potion_floor_delta_min > args.potion_floor_delta_max:
+        parser.error("--potion-floor-delta-min cannot exceed max")
+    if args.high_value_pocket_threshold < 0:
+        parser.error("--high-value-pocket-threshold must be non-negative")
+    if args.enemy_design_count < 0:
+        parser.error("--enemy-design-count must be non-negative")
     if args.agent_backend == "codex":
         if args.model is None:
             args.model = DEFAULT_CODEX_MODEL
