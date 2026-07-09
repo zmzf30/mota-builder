@@ -10,6 +10,7 @@ const promptBox = document.getElementById("promptBox");
 const initButton = document.getElementById("initButton");
 const envStatus = document.getElementById("envStatus");
 const errorBox = document.getElementById("errorBox");
+const warningBox = document.getElementById("warningBox");
 const progressBar = document.getElementById("progressBar");
 const progressText = document.getElementById("progressText");
 const logBox = document.getElementById("logBox");
@@ -21,11 +22,19 @@ const floorConcurrencyInput = document.getElementById("floorConcurrency");
 const floorConcurrencyField = document.getElementById("floorConcurrencyField");
 const resumeExistingInput = document.getElementById("resumeExisting");
 const resumeConcurrencyHint = document.getElementById("resumeConcurrencyHint");
+const agentBackendInput = form.elements.agentBackend;
+const maxAttemptsInput = form.elements.maxAttempts;
 
 let pollTimer = null;
 let currentRunId = null;
 const touchedResources = new Set();
 const touchedSpecialDamageValues = new Set();
+let maxAttemptsTouched = false;
+
+const agentMaxAttemptDefaults = {
+  codex: 4,
+  opencode: 6,
+};
 
 const resourceDefaults = (floors) => ({
   yellowDoors: floors * 4,
@@ -155,6 +164,19 @@ const clearError = () => {
   errorBox.hidden = true;
   errorBox.textContent = "";
 };
+
+const showWarnings = (warnings) => {
+  const items = Array.isArray(warnings) ? warnings.filter(Boolean) : [];
+  if (!items.length) {
+    warningBox.hidden = true;
+    warningBox.textContent = "";
+    return;
+  }
+  warningBox.textContent = `警告：${items.join(" ")}`;
+  warningBox.hidden = false;
+};
+
+const clearWarnings = () => showWarnings([]);
 
 const intValue = (data, key, label, min, max, errors) => {
   const value = Number(data[key]);
@@ -337,6 +359,12 @@ const syncResumeControls = () => {
   }
 };
 
+const syncAgentDefaults = () => {
+  if (!agentBackendInput || !maxAttemptsInput || maxAttemptsTouched) return;
+  const backend = String(agentBackendInput.value || "codex");
+  maxAttemptsInput.value = agentMaxAttemptDefaults[backend] || agentMaxAttemptDefaults.codex;
+};
+
 const setProgress = (value, message) => {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
   progressBar.style.width = `${pct}%`;
@@ -344,6 +372,19 @@ const setProgress = (value, message) => {
 };
 
 const isActiveState = (state) => state === "queued" || state === "running";
+
+const hasResultLinks = (status) => Boolean(status.play_url && status.editor_url && status.export_url);
+
+const renderResultActions = (status) => {
+  if (!hasResultLinks(status)) {
+    resultActions.hidden = true;
+    return;
+  }
+  playLink.href = status.play_url;
+  editorLink.href = status.editor_url;
+  exportLink.href = status.export_url;
+  resultActions.hidden = false;
+};
 
 const startPolling = (runId) => {
   if (pollTimer) clearInterval(pollTimer);
@@ -355,21 +396,23 @@ const startPolling = (runId) => {
 const renderStatus = (status) => {
   setProgress(status.progress || 0, beginnerLogLine(status.message || status.state || "运行中"));
   logBox.textContent = (status.logs || []).map(beginnerLogLine).join("\n");
+  showWarnings(status.warnings);
   if (status.state === "complete") {
-    resultActions.hidden = false;
-    playLink.href = status.play_url;
-    editorLink.href = status.editor_url;
-    exportLink.href = status.export_url;
+    renderResultActions(status);
     runButton.disabled = false;
     stopButton.hidden = true;
     currentRunId = null;
     if (pollTimer) clearInterval(pollTimer);
   } else if (status.state === "error") {
-    resultActions.hidden = true;
+    renderResultActions(status);
     runButton.disabled = false;
     stopButton.hidden = true;
     currentRunId = null;
-    showError(status.message || "生成失败");
+    if (hasResultLinks(status)) {
+      clearError();
+    } else {
+      showError(status.message || "生成失败");
+    }
     if (pollTimer) clearInterval(pollTimer);
   }
 };
@@ -385,6 +428,7 @@ const pollStatus = async (runId) => {
 
 const startRun = async () => {
   clearError();
+  clearWarnings();
   try {
     const payload = collectForm();
     resultActions.hidden = true;
@@ -430,6 +474,7 @@ const stopRun = async () => {
     if (pollTimer) clearInterval(pollTimer);
     currentRunId = null;
     resultActions.hidden = true;
+    clearWarnings();
     setProgress(0, "已终止并删除本次产物");
     logBox.textContent = "";
     runButton.disabled = false;
@@ -506,6 +551,12 @@ redPotionInput?.addEventListener("input", () => {
   applySpecialDamageDefaults();
 });
 
+maxAttemptsInput?.addEventListener("input", () => {
+  maxAttemptsTouched = true;
+});
+
+agentBackendInput?.addEventListener("change", syncAgentDefaults);
+
 resumeExistingInput?.addEventListener("change", syncResumeControls);
 
 form.querySelectorAll(".resource-input").forEach((input) => {
@@ -523,5 +574,6 @@ initButton.addEventListener("click", initMota);
 
 applyResourceDefaults();
 applySpecialDamageDefaults();
+syncAgentDefaults();
 syncResumeControls();
 loadHealth().then(restoreLatestRun);

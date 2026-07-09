@@ -188,6 +188,7 @@ python3 scripts/build_mota_tower.py \
 - `--resume-existing`：复用输出目录中已有的楼层审查结果继续生成。
 - `--parallel-floors --floor-concurrency 4`：并发生成楼层，速度更快，但每层会先被分配固定资源预算。
 - `--agent-backend codex|opencode`：选择内部 LLM 调用后端；默认 `codex`。
+- `--max-attempts <n>`：每层最大尝试次数；默认 Codex 为 `4`，OpenCode 为 `6`。
 - `--model <model>`：指定后端模型。默认 Codex 会传 `--model gpt-5.5`；OpenCode 只有显式设置时才会传 `--model`，通常写成 `provider/model`。
 - `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认还会传 `model_reasoning_effort="xhigh"` 和 `service_tier="priority"`。
 - `--codex-arg <arg>`：额外传给 `codex exec` 的原始参数，可重复。

@@ -68,7 +68,7 @@ python3 scripts/build_mota_tower.py --idea-text "<user idea>" --yes --parallel-f
 Prefer defaults unless the user gives a reason to change them.
 
 - `--out-dir`: Use a custom output directory only if the user requests one.
-- `--max-attempts`: Raise above `2` only for a harder design or if the user asks for more retries.
+- `--max-attempts`: Defaults to `4` for Codex and `6` for OpenCode. Raise the Codex default only for a harder design or if the user asks for more retries.
 - `--parallel-floors`: Use only when the user accepts the tradeoff. It is faster but each floor must fit a preassigned budget contract instead of reacting to the actual previous accepted floor.
 - `--floor-concurrency`: Defaults to 4 for `--parallel-floors`; lower it if the user wants fewer simultaneous Codex calls. The script rejects values above 4.
 - Per-floor generation is always staged: topology -> economy -> monster-special, followed by staged review and structured repair routing.

@@ -43,6 +43,8 @@ LOG_TAIL_LINES = 80
 ALLOWED_SPECIALS = {1, 2, 3, 15, 18}
 TIMEOUT_OPTIONS = {10, 20, 30, 60, 90, 120}
 RESUME_CONTROL_FIELDS = ("maxAttempts", "agentBackend", "timeoutMinutes")
+DEFAULT_MAX_ATTEMPTS = 4
+OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 STAGE_LABELS = {
     "topology": "地图结构",
     "economy": "资源和路线",
@@ -301,6 +303,8 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
     if floor_size != 13:
         errors.append("地图尺寸固定为 13x13。")
 
+    agent_backend = str(form.get("agentBackend") or "codex")
+    default_max_attempts = OPENCODE_DEFAULT_MAX_ATTEMPTS if agent_backend == "opencode" else DEFAULT_MAX_ATTEMPTS
     defaults = default_resources(floors)
     normalized: dict[str, Any] = {
         "floors": floors,
@@ -337,13 +341,13 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         "bluePotion": int_field(form, "bluePotion", "蓝血瓶 HP", 200, 0, None, errors),
         "yellowPotion": int_field(form, "yellowPotion", "黄血瓶 HP", 300, 0, None, errors),
         "greenPotion": int_field(form, "greenPotion", "绿血瓶 HP", 400, 0, None, errors),
-        "maxAttempts": int_field(form, "maxAttempts", "最大尝试次数", 4, 1, 10, errors),
+        "maxAttempts": int_field(form, "maxAttempts", "最大尝试次数", default_max_attempts, 1, 10, errors),
         "floorConcurrency": int_field(form, "floorConcurrency", "并发数", min(4, floors), 1, 4, errors),
         "enemyMin": int_field(form, "enemyMin", "每层怪物数量下限", 22, 1, 60, errors),
         "enemyMax": int_field(form, "enemyMax", "每层怪物数量上限", 33, 1, 60, errors),
         "maxWallSimilarity": float_field(form, "maxWallSimilarity", "层相似度上限", 0.9, 0.1, 1.0, errors),
-        "wallRatioMin": float_field(form, "wallRatioMin", "墙比例下限", 0.45, 0.1, 0.9, errors),
-        "wallRatioMax": float_field(form, "wallRatioMax", "墙比例上限", 0.65, 0.1, 0.9, errors),
+        "wallRatioMin": float_field(form, "wallRatioMin", "墙比例下限", 0.5, 0.1, 0.9, errors),
+        "wallRatioMax": float_field(form, "wallRatioMax", "墙比例上限", 0.6, 0.1, 0.9, errors),
         "monsterTypesPerFloor": int_field(form, "monsterTypesPerFloor", "每层怪物种类上限", 12, 1, 30, errors),
         "maxSpecialsPerMonster": int_field(form, "maxSpecialsPerMonster", "每怪特殊能力上限", 1, 1, 3, errors),
         "floorOverlapRatio": float_field(form, "floorOverlapRatio", "楼层怪物重叠率", 0.7, 0.0, 1.0, errors),
@@ -357,7 +361,7 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         "enemyDesignCount": int_field(form, "enemyDesignCount", "怪物表重写槽位数", 0, 0, 200, errors),
         "timeoutMinutes": int_field(form, "timeoutMinutes", "超时时间", 30, 10, 120, errors),
         "description": str(form.get("description") or "").strip(),
-        "agentBackend": str(form.get("agentBackend") or "codex"),
+        "agentBackend": agent_backend,
         "resumeExisting": bool_field(form, "resumeExisting", False),
         "noAdjacentEnemies": bool_field(form, "noAdjacentEnemies", True),
     }
@@ -468,8 +472,8 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
     description = str(form_value(form, "description", "") or "").strip()
     enemy_min = safe_int(form_value(form, "enemyMin"), 22, 0, 120)
     enemy_max = safe_int(form_value(form, "enemyMax"), 33, enemy_min, 160)
-    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.45, 0.1, 0.9)
-    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.65, wall_ratio_min, 0.9)
+    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.5, 0.1, 0.9)
+    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.6, wall_ratio_min, 0.9)
     special_damage_min = safe_float(form_value(form, "specialDamageMin"), 0.5, 0.0)
     special_damage_max = safe_float(form_value(form, "specialDamageMax"), 1.0, special_damage_min)
     gem_delta_min = safe_float(form_value(form, "gemFloorDeltaMin"), 0.0, 0.0, 10.0)
@@ -772,6 +776,73 @@ def project_dir_for(run_dir: Path) -> Path:
     return output_dir_for(run_dir) / "project"
 
 
+def project_result_payload(run_id: str, project_dir: Path) -> dict[str, Any]:
+    if not project_dir.exists():
+        return {"project_available": False, "project_dir": None}
+    return {
+        "project_available": True,
+        "project_dir": str(project_dir),
+        "play_url": f"/play/{run_id}/index.html",
+        "editor_url": f"/play/{run_id}/editor.html",
+        "export_url": f"/api/export?run_id={run_id}",
+    }
+
+
+def summary_warnings(summary: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    floors = summary.get("floors", [])
+    recovered: list[str] = []
+    forced: list[str] = []
+    if isinstance(floors, list):
+        for item in floors:
+            if not isinstance(item, dict):
+                continue
+            floor_id = str(item.get("floor_id") or "?")
+            if item.get("recovered_from"):
+                recovered.append(floor_id)
+            elif item.get("forced_accept"):
+                forced.append(floor_id)
+    if recovered:
+        warnings.append(
+            "部分楼层生成时出错，已用中间结果填入："
+            + "、".join(recovered[:8])
+            + (" 等" if len(recovered) > 8 else "")
+            + "。请在编辑器里检查和调整。"
+        )
+    if forced:
+        warnings.append(
+            "部分楼层为最后一轮强制保存："
+            + "、".join(forced[:8])
+            + (" 等" if len(forced) > 8 else "")
+            + "。质量可能需要手动调整。"
+        )
+    final_validation = summary.get("final_validation", {})
+    if isinstance(final_validation, dict) and final_validation.get("status") == "warn":
+        issues = final_validation.get("issues", [])
+        count = len(issues) if isinstance(issues, list) else 0
+        warnings.append(f"整塔校验有 {count} 条警告；生成结果已保留，可试玩和手动调整。")
+    return warnings
+
+
+def status_summary(run_dir: Path, status: dict[str, Any]) -> dict[str, Any]:
+    summary = status.get("summary")
+    if isinstance(summary, dict):
+        return summary
+    candidates: list[Path] = []
+    summary_path = status.get("summary_path")
+    if isinstance(summary_path, str) and summary_path:
+        candidates.append(Path(summary_path))
+    candidates.append(output_dir_for(run_dir) / "summary.json")
+    for path in candidates:
+        try:
+            if path.exists():
+                loaded = read_json(path)
+                return loaded if isinstance(loaded, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            continue
+    return {}
+
+
 def status_payload(run_id: str, run_dir: Path, reconcile_process: bool = False) -> dict[str, Any]:
     status_file = status_path(run_dir)
     if not status_file.exists():
@@ -783,6 +854,19 @@ def status_payload(run_id: str, run_dir: Path, reconcile_process: bool = False) 
         status["message"] = beginner_log_line(status["message"])
     if reconcile_process:
         status = reconcile_run_status(run_id, run_dir, status)
+    project_result = project_result_payload(run_id, project_dir_for(run_dir))
+    status.update(project_result)
+    if status.get("state") == "error" and project_result.get("project_available"):
+        status["state"] = "complete"
+        status["progress"] = 100
+        status["message"] = "生成结束；完整流水线未通过，但已保留可试玩和编辑的输出目录。"
+    warnings = summary_warnings(status_summary(run_dir, status))
+    if warnings:
+        status["warnings"] = warnings
+    elif status.get("state") == "complete" and status.get("return_code") not in (None, 0) and project_result.get("project_available"):
+        status["warnings"] = ["生成进程没有通过完整流水线，但已保留可试玩和编辑的输出目录。"]
+    else:
+        status.pop("warnings", None)
     return status
 
 
@@ -1007,7 +1091,7 @@ def run_build_worker(run_id: str, run_dir: Path, output_dir: Path, cmd: list[str
             "return_code": return_code,
             "logs": log_tail(log_file),
             "summary_path": str(summary_file) if summary_file.exists() else None,
-            "project_dir": str(project_dir) if project_dir.exists() else None,
+            **project_result_payload(run_id, project_dir),
         }
         if return_code == 0:
             summary = read_json(summary_file) if summary_file.exists() else {}
@@ -1023,19 +1107,21 @@ def run_build_worker(run_id: str, run_dir: Path, output_dir: Path, cmd: list[str
                     "state": "complete",
                     "progress": 100,
                     "message": completion_message,
-                    "play_url": f"/play/{run_id}/index.html",
-                    "editor_url": f"/play/{run_id}/editor.html",
-                    "export_url": f"/api/export?run_id={run_id}",
                 }
             )
             if summary:
                 payload["summary"] = summary
         else:
+            project_available = bool(payload.get("project_available"))
             payload.update(
                 {
-                    "state": "error",
-                    "progress": max(progress, 5),
-                    "message": "生成进程结束，但没有通过完整流水线。已保留当前输出目录。",
+                    "state": "complete" if project_available else "error",
+                    "progress": 100 if project_available else max(progress, 5),
+                    "message": (
+                        "生成进程结束；完整流水线未通过，但已保留可试玩和编辑的输出目录。"
+                        if project_available
+                        else "生成进程结束，但没有通过完整流水线。已保留当前输出目录。"
+                    ),
                 }
             )
         update_status(run_dir, **payload)
@@ -1202,10 +1288,7 @@ def recovered_completion_payload(run_id: str, output_dir: Path) -> dict[str, Any
         "progress": 100,
         "message": completion_message,
         "summary_path": str(summary_file),
-        "project_dir": str(project_dir),
-        "play_url": f"/play/{run_id}/index.html",
-        "editor_url": f"/play/{run_id}/editor.html",
-        "export_url": f"/api/export?run_id={run_id}",
+        **project_result_payload(run_id, project_dir),
     }
     if summary:
         payload["summary"] = summary

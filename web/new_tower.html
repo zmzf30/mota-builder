@@ -17,6 +17,7 @@
       </header>
 
       <section id="errorBox" class="error-box" hidden></section>
+      <section id="warningBox" class="warning-box" hidden></section>
 
       <div class="workspace">
         <form id="towerForm" class="form-column">
@@ -119,8 +120,8 @@
                 <label class="field"><span>怪物下限</span><input name="enemyMin" type="number" min="1" max="60" step="1" value="22" required /></label>
                 <label class="field"><span>怪物上限</span><input name="enemyMax" type="number" min="1" max="60" step="1" value="33" required /></label>
                 <label class="field"><span>相似度上限</span><input name="maxWallSimilarity" type="number" min="0.1" max="1" step="0.01" value="0.9" required /></label>
-                <label class="field"><span>墙比例下限</span><input name="wallRatioMin" type="number" min="0.1" max="0.9" step="0.01" value="0.45" required /></label>
-                <label class="field"><span>墙比例上限</span><input name="wallRatioMax" type="number" min="0.1" max="0.9" step="0.01" value="0.65" required /></label>
+                <label class="field"><span>墙比例下限</span><input name="wallRatioMin" type="number" min="0.1" max="0.9" step="0.01" value="0.5" required /></label>
+                <label class="field"><span>墙比例上限</span><input name="wallRatioMax" type="number" min="0.1" max="0.9" step="0.01" value="0.6" required /></label>
                 <label class="field"><span>怪物种类上限/层</span><input name="monsterTypesPerFloor" type="number" min="1" max="30" step="1" value="12" required /></label>
                 <label class="field"><span>每怪特殊上限</span><input name="maxSpecialsPerMonster" type="number" min="1" max="3" step="1" value="1" required /></label>
                 <label class="field"><span>楼层怪物重叠率</span><input name="floorOverlapRatio" type="number" min="0" max="1" step="0.01" value="0.7" required /></label>
