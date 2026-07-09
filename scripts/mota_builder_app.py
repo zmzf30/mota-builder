@@ -312,6 +312,7 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         "initialCenterFly": int_field(form, "initialCenterFly", "初始中心对称飞行器", 0, 0, None, errors),
         "initialBomb": int_field(form, "initialBomb", "初始炸弹", 0, 0, None, errors),
         "initialJumpShoes": int_field(form, "initialJumpShoes", "初始跳跃靴", 0, 0, None, errors),
+        "initialBook": int_field(form, "initialBook", "初始怪物手册", 1, 0, None, errors),
         "initialYellowKey": int_field(form, "initialYellowKey", "初始黄钥匙", 0, 0, None, errors),
         "initialBlueKey": int_field(form, "initialBlueKey", "初始蓝钥匙", 0, 0, None, errors),
         "yellowDoors": int_field(form, "yellowDoors", "黄门", defaults["yellowDoors"], 0, None, errors),
@@ -500,6 +501,7 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
         "bomb": safe_int(form_value(form, "initialBomb"), 0, 0),
         "centerFly": safe_int(form_value(form, "initialCenterFly"), 0, 0),
         "jumpShoes": safe_int(form_value(form, "initialJumpShoes"), 0, 0),
+        "book": safe_int(form_value(form, "initialBook"), 1, 0),
     }
     fixed_rules = [
         f"{floor_size}x{floor_size} floors",
@@ -627,6 +629,7 @@ def build_idea_prompt(form: dict[str, Any]) -> str:
 - 初始中心对称飞行器={form['initialCenterFly']}
 - 初始炸弹={form['initialBomb']}
 - 初始跳跃靴={form['initialJumpShoes']}
+- 初始怪物手册={form['initialBook']}
 - 初始黄钥匙={form['initialYellowKey']}
 - 初始蓝钥匙={form['initialBlueKey']}
 
@@ -828,6 +831,79 @@ def build_resume_command_form(run_dir: Path, current_form: dict[str, Any]) -> di
         merged[key] = current_form[key]
     merged["resumeExisting"] = True
     return normalize_form(merged)
+
+
+def migrate_brief_from_form(brief: dict[str, Any], form: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    form_brief = build_brief(form)
+    changed = False
+
+    limits = brief.get("global_limits")
+    if not isinstance(limits, dict):
+        limits = {}
+        brief["global_limits"] = limits
+        changed = True
+    for key, value in form_brief["global_limits"].items():
+        if limits.get(key) != value:
+            limits[key] = value
+            changed = True
+
+    settings = brief.get("global_settings")
+    if not isinstance(settings, dict):
+        settings = {}
+        brief["global_settings"] = settings
+        changed = True
+    form_settings = form_brief["global_settings"]
+
+    initial = settings.get("initial_hero")
+    if not isinstance(initial, dict):
+        initial = {}
+        settings["initial_hero"] = initial
+        changed = True
+    form_initial = form_settings["initial_hero"]
+    for key in ("hp", "atk", "def", "money"):
+        if initial.get(key) != form_initial[key]:
+            initial[key] = form_initial[key]
+            changed = True
+
+    keys = initial.get("keys")
+    if not isinstance(keys, dict):
+        keys = {}
+        initial["keys"] = keys
+        changed = True
+    for key, value in form_initial["keys"].items():
+        if keys.get(key) != value:
+            keys[key] = value
+            changed = True
+
+    tools = initial.get("tools")
+    if not isinstance(tools, dict):
+        tools = {}
+        initial["tools"] = tools
+        changed = True
+    for key, value in form_initial["tools"].items():
+        if tools.get(key) != value:
+            tools[key] = value
+            changed = True
+
+    for section_name in ("gems", "potions"):
+        section = settings.get(section_name)
+        if not isinstance(section, dict):
+            section = {}
+            settings[section_name] = section
+            changed = True
+        for key, value in form_settings[section_name].items():
+            if section.get(key) != value:
+                section[key] = value
+                changed = True
+
+    return brief, changed
+
+
+def migrate_resume_brief(run_dir: Path, command_form: dict[str, Any], brief: dict[str, Any]) -> dict[str, Any]:
+    migrated, changed = migrate_brief_from_form(brief, command_form)
+    if changed:
+        write_json(output_dir_for(run_dir) / "tower_brief.json", migrated)
+    return migrated
 
 
 def update_status(run_dir: Path, **changes: Any) -> dict[str, Any]:
@@ -1366,9 +1442,10 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     run_id, run_dir, existing_brief = find_latest_resumable_run()
                     input_path = output_dir_for(run_dir) / "tower_brief.json"
                     input_mode = "brief"
-                    floor_count = int(existing_brief.get("floor_count") or normalized["floors"])
                     idea_path = None
                     command_form = build_resume_command_form(run_dir, normalized)
+                    existing_brief = migrate_resume_brief(run_dir, command_form, existing_brief)
+                    floor_count = int(existing_brief.get("floor_count") or command_form["floors"])
                 else:
                     idea = build_idea_prompt(normalized)
                     run_id = make_run_id()

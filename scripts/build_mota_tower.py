@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
 import heapq
 import json
 import re
@@ -47,6 +48,8 @@ DEFAULT_CODEX_CONFIG = [
 ]
 AGENT_BACKENDS = ("codex", "opencode")
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
+CACHE_VERSION = "token-cache-v1"
+PROMPT_PAYLOAD_VERSION = "compact-prompts-v1"
 
 RESOURCE_WEIGHT_BY_ID = {
     "redGem": 1.0,
@@ -265,6 +268,15 @@ BRIEF_SCHEMA: dict[str, Any] = {
                                 "yellow": {"type": ["integer", "null"]},
                                 "blue": {"type": ["integer", "null"]},
                                 "red": {"type": ["integer", "null"]},
+                            }
+                        ),
+                        "tools": strict_schema_object(
+                            {
+                                "pickaxe": {"type": ["integer", "null"]},
+                                "bomb": {"type": ["integer", "null"]},
+                                "centerFly": {"type": ["integer", "null"]},
+                                "jumpShoes": {"type": ["integer", "null"]},
+                                "book": {"type": ["integer", "null"]},
                             }
                         ),
                     }
@@ -901,6 +913,251 @@ def monster_policy_bool(brief: dict[str, Any], key: str) -> bool:
 
 def project_dir(args: argparse.Namespace) -> Path:
     return args.repo_root / "mota-js" / "project"
+
+
+def stable_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def stable_hash(value: Any) -> str:
+    return hashlib.sha256(stable_json(value).encode("utf-8")).hexdigest()
+
+
+def cache_enabled(args: argparse.Namespace) -> bool:
+    return not bool(getattr(args, "no_generation_cache", False))
+
+
+def cache_entry_dir(args: argparse.Namespace, category: str, cache_key: str) -> Path:
+    return args.repo_root / "build" / "mota-cache" / CACHE_VERSION / category / cache_key[:2] / cache_key
+
+
+def read_cache_json(args: argparse.Namespace, category: str, cache_key: str, filename: str) -> dict[str, Any] | None:
+    if not cache_enabled(args):
+        return None
+    path = cache_entry_dir(args, category, cache_key) / filename
+    if not path.exists():
+        return None
+    try:
+        return load_json_object(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, PipelineError) as exc:
+        print(f"Cache ignored for {category}/{cache_key[:12]}: {exc}")
+        return None
+
+
+def write_cache_json(args: argparse.Namespace, category: str, cache_key: str, filename: str, value: dict[str, Any]) -> None:
+    if not cache_enabled(args):
+        return
+    try:
+        path = cache_entry_dir(args, category, cache_key) / filename
+        write_json(path, value)
+    except OSError as exc:
+        print(f"Cache write skipped for {category}/{cache_key[:12]}: {exc}")
+
+
+def cache_seed_args(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "backend": getattr(args, "agent_backend", None),
+        "model": getattr(args, "model", None),
+        "floor_prefix": getattr(args, "floor_prefix", "MT"),
+        "floor_number_offset": getattr(args, "floor_number_offset", 0),
+    }
+
+
+def cacheable_brief(brief: dict[str, Any], include_enemy_design: bool = True) -> dict[str, Any]:
+    cloned = core_clone(brief)
+    if not include_enemy_design:
+        cloned.pop("enemy_design", None)
+    return cloned
+
+
+def compact_tower_brief_for_prompt(brief: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "summary",
+        "floor_count",
+        "floor_size",
+        "fixed_rules",
+        "global_limits",
+        "global_settings",
+        "monster_policy",
+        "resource_policy",
+        "layout_policy",
+        "layout_constraints",
+    )
+    compact = {key: core_clone(brief[key]) for key in keys if key in brief}
+    enemy_design = brief.get("enemy_design", {})
+    if isinstance(enemy_design, dict):
+        designed_ids = [
+            str(item)
+            for item in enemy_design.get("designed_enemy_ids", [])
+            if isinstance(item, (str, int))
+        ]
+        compact["enemy_design"] = {
+            "summary": str(enemy_design.get("summary", ""))[:500],
+            "designed_enemy_count": len(designed_ids),
+            "designed_enemy_ids": designed_ids[:40],
+            "warnings": [
+                str(item)[:240]
+                for item in enemy_design.get("warnings", [])
+                if isinstance(item, (str, int, float))
+            ][:5],
+        }
+    return compact
+
+
+def compact_previous_floor_summaries(previous: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    compact: list[dict[str, Any]] = []
+    for item in previous[-6:]:
+        if not isinstance(item, dict):
+            continue
+        summary: dict[str, Any] = {
+            "floor_id": item.get("floor_id"),
+            "summary": str(item.get("summary", ""))[:500],
+            "budget_delta": normalize_delta(item.get("budget_delta")),
+        }
+        for key in ("forced_accept", "parallel", "resumed"):
+            if key in item:
+                summary[key] = item[key]
+        if isinstance(item.get("floor_contract"), dict):
+            contract = item["floor_contract"]
+            summary["floor_contract"] = {
+                "role": contract.get("role"),
+                "resource_limits": contract.get("resource_limits", {}),
+            }
+        compact.append(summary)
+    return compact
+
+
+def compact_stage_output_summary(output: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(output, dict):
+        return {}
+    annotations = output.get("annotations", [])
+    annotation_kinds: dict[str, int] = {}
+    if isinstance(annotations, list):
+        for annotation in annotations:
+            if not isinstance(annotation, dict):
+                continue
+            kind = str(annotation.get("kind") or "unknown")
+            annotation_kinds[kind] = annotation_kinds.get(kind, 0) + 1
+    floor = output.get("floor", {}) if isinstance(output.get("floor"), dict) else {}
+    matrix = floor.get("map", [])
+    tile_counts: dict[str, int] = {}
+    if isinstance(matrix, list):
+        for row in matrix:
+            if not isinstance(row, list):
+                continue
+            for code in row:
+                if isinstance(code, int) and not isinstance(code, bool):
+                    key = str(code)
+                    tile_counts[key] = tile_counts.get(key, 0) + 1
+    return {
+        "floor_id": output.get("floor_id"),
+        "floor_index": output.get("floor_index"),
+        "summary": str(output.get("summary", ""))[:500],
+        "annotation_kinds": annotation_kinds,
+        "tile_counts": dict(sorted(tile_counts.items(), key=lambda item: (-item[1], item[0]))[:16]),
+    }
+
+
+def brief_cache_key(args: argparse.Namespace, idea: str) -> str:
+    return stable_hash(
+        {
+            "kind": "brief",
+            "cache_version": CACHE_VERSION,
+            "prompt_payload_version": PROMPT_PAYLOAD_VERSION,
+            "agent": cache_seed_args(args),
+            "idea": idea,
+            "floors": getattr(args, "floors", None),
+            "floor_size": getattr(args, "floor_size", None),
+        }
+    )
+
+
+def project_tables_hash(maps: dict[str, Any], enemys: dict[str, Any]) -> str:
+    return stable_hash({"maps": maps, "enemys": enemys})
+
+
+def enemy_design_cache_key(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    maps: dict[str, Any],
+    source_enemys: dict[str, Any],
+    floor_count: int,
+    floor_size: int,
+) -> str:
+    return stable_hash(
+        {
+            "kind": "enemy_design",
+            "cache_version": CACHE_VERSION,
+            "prompt_payload_version": PROMPT_PAYLOAD_VERSION,
+            "agent": cache_seed_args(args),
+            "brief": cacheable_brief(brief, include_enemy_design=False),
+            "project_tables_hash": project_tables_hash(maps, source_enemys),
+            "floor_count": floor_count,
+            "floor_size": floor_size,
+            "enemy_design_count": getattr(args, "enemy_design_count", DEFAULT_ENEMY_DESIGN_COUNT),
+        }
+    )
+
+
+def floor_generation_cache_key(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    floor_index: int,
+    floor_count: int,
+    floor_size: int,
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    used: dict[str, int],
+    limits: dict[str, int | None],
+    accepted_summaries: list[dict[str, Any]],
+    accepted_floors: list[dict[str, Any]],
+    floor_policy: dict[str, Any],
+    floor_contract: dict[str, Any] | None,
+    enforce_resource_progression: bool,
+) -> str:
+    return stable_hash(
+        {
+            "kind": "floor",
+            "cache_version": CACHE_VERSION,
+            "prompt_payload_version": PROMPT_PAYLOAD_VERSION,
+            "agent": cache_seed_args(args),
+            "max_attempts": getattr(args, "max_attempts", None),
+            "max_wall_similarity": getattr(args, "max_wall_similarity", None),
+            "brief": cacheable_brief(brief),
+            "floor_index": floor_index,
+            "floor_count": floor_count,
+            "floor_size": floor_size,
+            "project_tables_hash": project_tables_hash(maps, enemys),
+            "used_budget_so_far": used,
+            "limits": limits,
+            "accepted_summaries": compact_previous_floor_summaries(accepted_summaries),
+            "accepted_floor_hashes": [stable_hash(floor) for floor in accepted_floors],
+            "floor_policy": floor_policy,
+            "floor_contract": floor_contract or {},
+            "enforce_resource_progression": enforce_resource_progression,
+        }
+    )
+
+
+def read_cached_floor_result(args: argparse.Namespace, cache_key: str) -> dict[str, Any] | None:
+    floor_output = read_cache_json(args, "floors", cache_key, "floor.json")
+    review = read_cache_json(args, "floors", cache_key, "review.json")
+    if floor_output is None or review is None:
+        return None
+    return {
+        "floor_index": floor_output.get("floor_index"),
+        "floor_output": floor_output,
+        "review": review,
+        "budget_delta": normalize_delta(review.get("budget_delta")),
+    }
+
+
+def write_cached_floor_result(args: argparse.Namespace, cache_key: str, result: dict[str, Any]) -> None:
+    floor_output = result.get("floor_output")
+    review = result.get("review")
+    if isinstance(floor_output, dict) and isinstance(review, dict):
+        write_cache_json(args, "floors", cache_key, "floor.json", floor_output)
+        write_cache_json(args, "floors", cache_key, "review.json", review)
 
 
 def load_project_tables(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -3284,6 +3541,18 @@ def build_opencode_command(args: argparse.Namespace, prompt_path: Path) -> list[
     return cmd
 
 
+def agent_command_for_subprocess(cmd: list[str]) -> list[str]:
+    if sys.platform != "darwin":
+        return cmd
+    return [
+        "/bin/bash",
+        "-lc",
+        'if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi; exec "$@"',
+        "bash",
+        *cmd,
+    ]
+
+
 def prompt_with_inline_schema(prompt: str, schema: dict[str, Any], output_path: Path | None = None) -> str:
     schema_text = json.dumps(schema, ensure_ascii=False, indent=2)
     result = (
@@ -3325,7 +3594,7 @@ def codex_exec(
     try:
         cmd = build_codex_command(args, schema_path, output_path)
         result = subprocess.run(
-            cmd,
+            agent_command_for_subprocess(cmd),
             input=prompt,
             text=True,
             capture_output=True,
@@ -3361,7 +3630,7 @@ def opencode_exec(
     try:
         cmd = build_opencode_command(args, prompt_path)
         result = subprocess.run(
-            cmd,
+            agent_command_for_subprocess(cmd),
             text=True,
             capture_output=True,
             timeout=args.timeout,
@@ -3461,7 +3730,7 @@ def build_enemy_design_prompt(
     else:
         target_updates = len(slot_lines)
     payload = {
-        "tower_brief": brief,
+        "tower_brief": compact_tower_brief_for_prompt(brief),
         "floor_count": floor_count,
         "floor_size": floor_size,
         "allowed_specials": allowed_specials,
@@ -3649,6 +3918,28 @@ def prepare_runtime_enemy_table(
         print("No existing generated enemy table found; resume will keep the current project enemy stats.")
         return source_enemys
 
+    cache_key = enemy_design_cache_key(args, brief, maps, source_enemys, floor_count, floor_size)
+    cached_design = read_cache_json(args, "enemy_design", cache_key, "enemy_design.json")
+    cached_enemys = read_cache_json(args, "enemy_design", cache_key, "enemys.generated.json")
+    if cached_design is not None and cached_enemys is not None:
+        applied_ids = [
+            str(item)
+            for item in cached_design.get("applied_enemy_ids", cached_design.get("designed_enemy_ids", []))
+            if isinstance(item, (str, int))
+        ]
+        if applied_ids:
+            write_json(design_path, cached_design)
+            write_json(generated_path, cached_enemys)
+            brief["enemy_design"] = {
+                "summary": cached_design.get("summary", "Loaded cached generated enemy table."),
+                "designed_enemy_ids": applied_ids,
+                "warnings": cached_design.get("warnings", []),
+                "cache_key": cache_key,
+            }
+            args.runtime_enemys = cached_enemys
+            print(f"复用缓存怪物数据：{len(applied_ids)} 个怪物槽位。")
+            return cached_enemys
+
     design = agent_exec(
         args,
         build_enemy_design_prompt(args, brief, maps, source_enemys, floor_count, floor_size),
@@ -3663,10 +3954,13 @@ def prepare_runtime_enemy_table(
     design["warnings"] = warnings
     write_json(design_path, design)
     write_json(generated_path, runtime_enemys)
+    write_cache_json(args, "enemy_design", cache_key, "enemy_design.json", design)
+    write_cache_json(args, "enemy_design", cache_key, "enemys.generated.json", runtime_enemys)
     brief["enemy_design"] = {
         "summary": design.get("summary", ""),
         "designed_enemy_ids": applied_ids,
         "warnings": warnings,
+        "cache_key": cache_key,
     }
     args.runtime_enemys = runtime_enemys
     print(f"已设计 {len(applied_ids)} 个怪物数据。")
@@ -3688,7 +3982,7 @@ def staged_common_payload(
 ) -> dict[str, Any]:
     floor_number = floor_index + args.floor_number_offset
     return {
-        "tower_brief": brief,
+        "tower_brief": compact_tower_brief_for_prompt(brief),
         "floor_index": floor_index,
         "floor_id": f"{args.floor_prefix}{floor_number}",
         "floor_size": normalize_floor_size(brief.get("floor_size")),
@@ -3696,7 +3990,7 @@ def staged_common_payload(
         "current_floor_policy": floor_policy or {},
         "used_budget_so_far": used,
         "remaining_whole_tower_budget": remaining_budget(limits, used),
-        "previous_accepted_floor_summaries": previous,
+        "previous_accepted_floor_summaries": compact_previous_floor_summaries(previous),
         "floor_contract": floor_contract or {},
         "layout_constraints": layout_constraints_summary(brief),
         "repair_feedback": minimal_repair_feedback(feedback),
@@ -4000,16 +4294,18 @@ def staged_review_prompt(
     maps, enemys = load_project_tables(args)
     tile_catalog = build_tile_catalog(maps, enemys, brief, floor_policy)
     payload = {
-        "tower_brief": brief,
+        "tower_brief": compact_tower_brief_for_prompt(brief),
         "stage": stage,
         "stage_output": stage_output,
-        "topology_output": topology_output or {},
-        "economy_output": economy_output or {},
+        "source_stage_summaries": {
+            "topology": compact_stage_output_summary(topology_output),
+            "economy": compact_stage_output_summary(economy_output),
+        },
         "floor_size": normalize_floor_size(brief.get("floor_size")),
         "current_floor_policy": floor_policy or {},
         "used_budget_so_far": used,
         "remaining_whole_tower_budget": remaining_budget(limits, used),
-        "previous_accepted_floor_summaries": previous,
+        "previous_accepted_floor_summaries": compact_previous_floor_summaries(previous),
         "static_metrics": metrics or {},
         "budget_delta_from_map": delta,
         "floor_contract": floor_contract or {},
@@ -4280,6 +4576,7 @@ def write_generated_project(
             "bomb": ("bomb", "bombs", "bomb_start"),
             "centerFly": ("centerFly", "center_fly", "centerFly_start", "center_fly_start"),
             "jumpShoes": ("jumpShoes", "jump_shoes", "jumpShoes_start", "jump_shoes_start"),
+            "book": ("book", "monster_book", "monsterBook", "initialBook", "book_start", "monster_book_start"),
         }
         for item_id, aliases in tool_aliases.items():
             value = next((initial.get(alias) for alias in aliases if isinstance(initial.get(alias), (int, float))), None)
@@ -4693,6 +4990,26 @@ def generate_floor_staged_with_retries(
     feedback: dict[str, Any] | None = None
     repair_stage = "topology"
     repair_stage_outputs: dict[str, dict[str, Any]] = {}
+    floor_cache_key = floor_generation_cache_key(
+        args,
+        brief,
+        floor_index,
+        floor_count,
+        floor_size,
+        maps,
+        enemys,
+        used,
+        limits,
+        accepted_summaries,
+        accepted_floors,
+        floor_policy,
+        floor_contract,
+        enforce_resource_progression,
+    )
+    cached_result = read_cached_floor_result(args, floor_cache_key)
+    if cached_result is not None:
+        print(f"{floor_label(floor_index)}复用缓存结果。")
+        return cached_result
 
     for attempt in range(1, args.max_attempts + 1):
         final_attempt = attempt == args.max_attempts
@@ -4920,12 +5237,14 @@ def generate_floor_staged_with_retries(
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.monster.json", monster_output)
             if is_forced_accept_review(integration_review):
                 print(f"{floor_label(floor_index)}已保存，但质量需要生成结束后手动看一下。")
-            return {
+            result = {
                 "floor_index": floor_index,
                 "floor_output": monster_output,
                 "review": integration_review,
                 "budget_delta": normalize_delta(integration_review.get("budget_delta")),
             }
+            write_cached_floor_result(args, floor_cache_key, result)
+            return result
 
         feedback = integration_review
         repair_stage_outputs["topology"] = topology_output
@@ -5221,7 +5540,14 @@ def run_pipeline(args: argparse.Namespace) -> int:
         brief = load_json_object(Path(args.brief_file).read_text(encoding="utf-8"))
     else:
         idea = read_text_arg(args.idea_file, args.idea_text)
-        brief = agent_exec(args, build_brief_prompt(args, idea), BRIEF_SCHEMA, brief_output)
+        cache_key = brief_cache_key(args, idea)
+        cached_brief = read_cache_json(args, "briefs", cache_key, "tower_brief.json")
+        if cached_brief is not None:
+            brief = cached_brief
+            print("复用缓存 brief。")
+        else:
+            brief = agent_exec(args, build_brief_prompt(args, idea), BRIEF_SCHEMA, brief_output)
+            write_cache_json(args, "briefs", cache_key, "tower_brief.json", brief)
     write_json(brief_output, brief)
 
     print("\nTower brief summary:")
@@ -5393,6 +5719,27 @@ def self_test(repo_root: Path) -> int:
     used = add_budget({key: 0 for key in TRACKED_RESOURCES}, normalize_delta({"blue_keys": 1}))
     assert used["blue_keys"] == 1
     assert remaining_budget({"blue_keys": 3}, used)["blue_keys"] == 2
+    assert stable_hash({"b": 1, "a": 2}) == stable_hash({"a": 2, "b": 1})
+    compact_brief = compact_tower_brief_for_prompt(
+        {
+            "summary": "compact",
+            "floor_count": 1,
+            "floor_size": 9,
+            "global_limits": {"yellow_doors": 1},
+            "confirmation_prompt": "do not send this to floor stages",
+        }
+    )
+    assert compact_brief["summary"] == "compact"
+    assert "confirmation_prompt" not in compact_brief
+    with tempfile.TemporaryDirectory() as cache_tmp:
+        cache_args = argparse.Namespace(repo_root=Path(cache_tmp), no_generation_cache=False)
+        write_cache_json(cache_args, "briefs", "abcdef123456", "tower_brief.json", {"status": "ready"})
+        assert read_cache_json(cache_args, "briefs", "abcdef123456", "tower_brief.json") == {"status": "ready"}
+    initial_hero_schema = BRIEF_SCHEMA["properties"]["global_settings"]["properties"]["initial_hero"]
+    assert "tools" in initial_hero_schema["properties"]
+    assert {"pickaxe", "bomb", "centerFly", "jumpShoes", "book"} <= set(
+        initial_hero_schema["properties"]["tools"]["properties"]
+    )
     assert normalize_floor_size(None) == DEFAULT_FLOOR_SIZE
     assert normalize_floor_size("13x13") == 13
     assert normalize_floor_size(9) == 9
@@ -5433,6 +5780,21 @@ def self_test(repo_root: Path) -> int:
     assert "model_reasoning_effort" not in opencode_cmd_text
     assert "service_tier" not in opencode_cmd_text
     assert opencode_cmd[-2:] == ["--file", "/tmp/prompt.md"]
+    original_platform = sys.platform
+    try:
+        sys.platform = "darwin"
+        mac_agent_cmd = agent_command_for_subprocess(codex_cmd)
+        assert mac_agent_cmd[:3] == [
+            "/bin/bash",
+            "-lc",
+            'if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi; exec "$@"',
+        ]
+        assert mac_agent_cmd[3] == "bash"
+        assert mac_agent_cmd[4:] == codex_cmd
+        sys.platform = "linux"
+        assert agent_command_for_subprocess(codex_cmd) == codex_cmd
+    finally:
+        sys.platform = original_platform
     parsed_defaults = parse_args(["--self-test"])
     assert parsed_defaults.timeout == DEFAULT_AGENT_TIMEOUT_SECONDS
     args = argparse.Namespace(repo_root=repo_root)
@@ -5688,6 +6050,57 @@ def self_test(repo_root: Path) -> int:
         assert monster_delta[key] == sample_delta[key]
     assert monster_metrics["available"] is True
 
+    original_agent_exec = globals()["agent_exec"]
+    with tempfile.TemporaryDirectory() as forced_tmp:
+        forced_args = argparse.Namespace(
+            repo_root=repo_root,
+            out_dir=Path(forced_tmp),
+            floor_prefix="MT",
+            floor_number_offset=0,
+            max_attempts=1,
+            no_generation_cache=True,
+        )
+        fake_stage_outputs = [
+            core_clone(topology_floor_output),
+            core_clone(economy_floor_output),
+            core_clone(monster_floor_output),
+        ]
+        fake_calls: list[str] = []
+
+        def fake_agent_exec(
+            _args: argparse.Namespace,
+            _prompt: str,
+            schema: dict[str, Any],
+            output_path: Path,
+        ) -> dict[str, Any]:
+            if schema is STRUCTURED_REVIEW_SCHEMA:
+                raise AssertionError("final attempt must not call LLM review")
+            fake_calls.append(output_path.name)
+            return fake_stage_outputs.pop(0)
+
+        globals()["agent_exec"] = fake_agent_exec
+        try:
+            forced_result = generate_floor_staged_with_retries(
+                forced_args,
+                sample_brief,
+                0,
+                1,
+                9,
+                maps,
+                enemys,
+                empty_budget(),
+                {key: None for key in TRACKED_RESOURCES},
+                [],
+                [],
+                {},
+                None,
+                False,
+            )
+        finally:
+            globals()["agent_exec"] = original_agent_exec
+        assert is_forced_accept_review(forced_result["review"])
+        assert len(fake_calls) == 3
+
     integration_review = structured_review(
         "integration",
         [
@@ -5724,6 +6137,7 @@ def self_test(repo_root: Path) -> int:
     )
     assert "current_stage_output_to_repair" in repair_prompt
     assert "broken topology output" in repair_prompt
+    assert "do not send this to floor stages" not in repair_prompt
 
     too_few_enemy_floor = core_clone(sample_floor_output)
     too_few_enemy_floor["floor"]["map"][5][2] = 0
@@ -5828,7 +6242,7 @@ def self_test(repo_root: Path) -> int:
                         "atk": 12,
                         "def": 8,
                         "keys": {"yellow": 2, "blue": 1},
-                        "tools": {"pickaxe": 1, "bomb": 2, "centerFly": 3, "jumpShoes": 4},
+                        "tools": {"pickaxe": 1, "bomb": 2, "centerFly": 3, "jumpShoes": 4, "book": 1},
                     },
                     "gems": {"red": 2, "blue": 3, "green": 5},
                     "potions": {"red": 80, "blue": 200, "yellow": 500, "green": 1000},
@@ -5851,6 +6265,7 @@ def self_test(repo_root: Path) -> int:
         assert written_data["firstData"]["hero"]["items"]["tools"]["bomb"] == 2
         assert written_data["firstData"]["hero"]["items"]["tools"]["centerFly"] == 3
         assert written_data["firstData"]["hero"]["items"]["tools"]["jumpShoes"] == 4
+        assert written_data["firstData"]["hero"]["items"]["tools"]["book"] == 1
         assert written_data["values"]["redGem"] == 2
         assert written_data["values"]["bluePotion"] == 200
         exact_limits = {key: sample_delta.get(key, 0) for key in TRACKED_RESOURCES}
@@ -5941,6 +6356,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--clean", action="store_true", help="Remove the output directory first; only allowed under repo build/.")
     parser.add_argument("--resume-existing", action="store_true", help="Reuse existing accepted floor/review JSON files in the output directory.")
     parser.add_argument("--keep-prompts", action="store_true", help="Write each agent prompt next to its output JSON.")
+    parser.add_argument("--no-generation-cache", action="store_true", help="Disable hash-based reuse of brief, enemy table, and accepted floor outputs.")
     parser.add_argument(
         "--agent-backend",
         choices=AGENT_BACKENDS,

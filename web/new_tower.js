@@ -17,6 +17,10 @@ const resultActions = document.getElementById("resultActions");
 const playLink = document.getElementById("playLink");
 const editorLink = document.getElementById("editorLink");
 const exportLink = document.getElementById("exportLink");
+const floorConcurrencyInput = document.getElementById("floorConcurrency");
+const floorConcurrencyField = document.getElementById("floorConcurrencyField");
+const resumeExistingInput = document.getElementById("resumeExisting");
+const resumeConcurrencyHint = document.getElementById("resumeConcurrencyHint");
 
 let pollTimer = null;
 let currentRunId = null;
@@ -188,6 +192,7 @@ const validateFormData = (data) => {
     ["initialCenterFly", "初始中心对称飞行器", 0],
     ["initialBomb", "初始炸弹", 0],
     ["initialJumpShoes", "初始跳跃靴", 0],
+    ["initialBook", "初始怪物手册", 0],
     ["initialYellowKey", "初始黄钥匙", 0],
     ["initialBlueKey", "初始蓝钥匙", 0],
     ["yellowDoors", "黄门", 0],
@@ -281,6 +286,9 @@ const postJson = async (url, payload) => {
 
 const collectForm = () => {
   const data = Object.fromEntries(new FormData(form).entries());
+  if (!("floorConcurrency" in data) && floorConcurrencyInput) {
+    data.floorConcurrency = floorConcurrencyInput.value;
+  }
   for (const [key, value] of Object.entries(data)) {
     if (value !== "" && !Number.isNaN(Number(value))) {
       data[key] = Number(value);
@@ -316,6 +324,17 @@ const applySpecialDamageDefaults = () => {
   const maxInput = form.elements.specialDamageValueMax;
   if (minInput) minInput.value = Math.round(redPotion * 0.5);
   if (maxInput) maxInput.value = Math.round(redPotion);
+};
+
+const syncResumeControls = () => {
+  const isResume = resumeExistingInput?.checked === true;
+  if (floorConcurrencyInput) {
+    floorConcurrencyInput.disabled = isResume;
+  }
+  floorConcurrencyField?.classList.toggle("is-disabled", isResume);
+  if (resumeConcurrencyHint) {
+    resumeConcurrencyHint.hidden = !isResume;
+  }
 };
 
 const setProgress = (value, message) => {
@@ -392,7 +411,7 @@ const viewFullPrompt = async () => {
     const payload = collectForm();
     const data = await postJson("/api/prompt", { form: payload });
     const prefix = payload.resumeExisting
-      ? "继续上次未完成生成会复用上次输出目录中的 tower_brief.json，不会使用当前基础/高级配置生成新的 brief；当前页面只影响运行控制项。\n\n当前表单对应的新建提示词如下：\n\n"
+      ? "继续上次未完成生成会复用上次输出目录中的 tower_brief.json，不会使用当前基础/高级配置生成新的 brief；系统只会用原始请求补齐旧 brief 缺失的资源和初始工具字段，继续模式会按楼层顺序修复，不使用并发数。\n\n当前表单对应的新建提示词如下：\n\n"
       : "";
     promptBox.textContent = `${prefix}${data.prompt}`;
     promptBox.hidden = false;
@@ -487,6 +506,8 @@ redPotionInput?.addEventListener("input", () => {
   applySpecialDamageDefaults();
 });
 
+resumeExistingInput?.addEventListener("change", syncResumeControls);
+
 form.querySelectorAll(".resource-input").forEach((input) => {
   input.addEventListener("input", () => touchedResources.add(input.name));
 });
@@ -502,4 +523,5 @@ initButton.addEventListener("click", initMota);
 
 applyResourceDefaults();
 applySpecialDamageDefaults();
+syncResumeControls();
 loadHealth().then(restoreLatestRun);

@@ -196,6 +196,7 @@ python3 scripts/build_mota_tower.py \
 - `--max-wall-similarity <0-1>`：相邻楼层墙体相似度上限，默认 `0.9`。
 - `--skip-playtest`：跳过浏览器试玩。
 - `--keep-prompts`：保留每个阶段发给 agent 的 prompt，方便调试。
+- `--no-generation-cache`：关闭 brief、怪物表和已接受楼层的 hash 缓存复用。
 - `--self-test`：运行脚本内置本地测试，不调用外部 agent。
 
 OpenCode 示例：
@@ -244,6 +245,7 @@ python3 skills/playtest-mota-game/scripts/playtest_mota_game.py \
 - Web UI 可配置初始跳跃靴，以及全塔宝石、血瓶和跳跃靴数量；这些数量会进入全塔资源预算校验。
 - Web UI 高级选项可调整墙比例、每层怪物种类上限、每怪特殊能力上限、是否禁止相邻怪物、楼层怪物重叠率和领域/阻击伤害具体数值范围；这些是生成和校验目标，不保证大模型输出完全遵循。
 - 达到最大尝试次数的最后一轮会跳过 review 并保存最新结果，生成可继续试玩和手动调整的产物。
+- 流水线会压缩阶段 prompt 上下文，并按输入 hash 缓存 brief、怪物表和已接受楼层，重复相同配置时会优先复用稳定结果。
 - 不依赖随机、隐藏脚本、新素材、复杂 UI、插件机制或重剧情事件。
 
 这些约束主要写在 `skills/*/SKILL.md` 和 `scripts/build_mota_tower.py` 中。修改约束时建议先调整技能说明，再运行 `--self-test` 和小规模生成验证。

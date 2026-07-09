@@ -230,6 +230,24 @@ h3 {
   box-shadow: 0 0 0 3px rgba(47, 100, 163, 0.12);
 }
 
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled {
+  background: #f0f3f1;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.field.is-disabled > span {
+  color: #8a948f;
+}
+
+.field-hint {
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .wide {
   margin-top: 16px;
 }

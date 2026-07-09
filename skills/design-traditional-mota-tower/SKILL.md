@@ -50,7 +50,7 @@ Before returning a buildable brief, identify whether these values are present or
 
 - `floor_count`
 - `floor_size`: use 11 if unspecified; otherwise use only 9, 11, or 13.
-- Initial hero HP, attack, defense, money, and starting yellow/blue/red keys.
+- Initial hero HP, attack, defense, money, starting yellow/blue/red keys, starting pickaxe, bomb, centerFly, jumpShoes, and monster book counts.
 - Red, blue, and green gem values.
 - Red, blue, yellow, and green potion values.
 - Shop progressive gold-cost rule and attack/defense gain per purchase.
@@ -99,6 +99,13 @@ Use this shape:
         "yellow": 0,
         "blue": 0,
         "red": 0
+      },
+      "tools": {
+        "pickaxe": 0,
+        "bomb": 0,
+        "centerFly": 0,
+        "jumpShoes": 0,
+        "book": 1
       }
     },
     "gems": {
