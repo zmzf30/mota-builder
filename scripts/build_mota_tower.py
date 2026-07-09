@@ -3651,18 +3651,28 @@ def opencode_exec(
             + f"stderr:\n{result.stderr}"
         )
     parsed = None
+    output_text: str | None = None
+    output_parse_error: str | None = None
     if output_path.exists():
         try:
-            parsed = load_json_object(output_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, PipelineError):
+            output_text = output_path.read_text(encoding="utf-8", errors="replace")
+            parsed = load_json_object(output_text)
+        except (OSError, json.JSONDecodeError, PipelineError) as exc:
+            output_parse_error = str(exc)
             parsed = None
     if parsed is None:
         try:
             parsed = load_json_object(result.stdout)
         except (json.JSONDecodeError, PipelineError) as exc:
+            output_file_content = output_text if output_text is not None else "<missing>"
+            output_file_parse_error = output_parse_error or "<not read or not attempted>"
             raise PipelineError(
                 "opencode output must contain a JSON object.\n"
                 + f"command: {' '.join(cmd)}\n"
+                + f"stdout parse error: {exc}\n"
+                + f"output file: {output_path}\n"
+                + f"output file parse error: {output_file_parse_error}\n"
+                + f"output file content:\n{output_file_content}\n"
                 + f"stdout:\n{result.stdout}\n"
                 + f"stderr:\n{result.stderr}"
             ) from exc
@@ -4869,6 +4879,87 @@ def forced_accept_review(
     }
 
 
+def compact_exception_message(exc: BaseException, limit: int = 600) -> str:
+    text = " ".join(str(exc).split()) or exc.__class__.__name__
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)] + "..."
+
+
+def retry_stage_after_exception(stage: str) -> str:
+    return stage if stage in STAGE_ORDER else "monster"
+
+
+def stage_exception_payload(
+    floor_index: int,
+    attempt: int,
+    max_attempts: int,
+    stage: str,
+    exc: BaseException,
+) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "floor_index": floor_index,
+        "attempt": attempt,
+        "stage": stage,
+        "failed_stage": stage,
+        "retry_stage": retry_stage_after_exception(stage),
+        "will_retry": attempt < max_attempts,
+        "exception_type": exc.__class__.__name__,
+        "summary": compact_exception_message(exc),
+        "message": str(exc),
+    }
+
+
+def write_stage_exception_or_raise(
+    prefix: Path,
+    floor_index: int,
+    attempt: int,
+    max_attempts: int,
+    stage: str,
+    exc: BaseException,
+) -> dict[str, Any]:
+    payload = stage_exception_payload(floor_index, attempt, max_attempts, stage, exc)
+    write_json(prefix.with_suffix(".error.json"), payload)
+    if attempt >= max_attempts:
+        raise PipelineError(
+            f"MT{floor_index} {stage} failed on final attempt {attempt}: {payload['summary']}"
+        ) from exc
+    return payload
+
+
+def feedback_after_exception(
+    feedback: dict[str, Any] | None,
+    feedback_attempt: int | None,
+    attempt: int,
+    active_repair_stage: str,
+    retry_stage: str,
+) -> dict[str, Any] | None:
+    if feedback is None or feedback_attempt != attempt - 1:
+        return None
+    if active_repair_stage != retry_stage:
+        return None
+    return feedback
+
+
+def stage_exception_retry_message(
+    floor_index: int,
+    stage: str,
+    attempt: int,
+    max_attempts: int,
+    exc: BaseException,
+    repair_stage: str | None = None,
+) -> str:
+    stage_label = STAGE_LABELS.get(stage, stage)
+    repair_label = STAGE_LABELS.get(repair_stage or retry_stage_after_exception(stage), repair_stage or stage)
+    next_attempt = min(attempt + 1, max_attempts)
+    return (
+        f"{floor_label(floor_index)}第 {attempt} 次{stage_label}执行出错，"
+        f"正在从{repair_label}用第 {next_attempt} 次继续 generator-reviewer。"
+        f"原因：{compact_exception_message(exc, 1200)}"
+    )
+
+
 def write_floor_checkpoint(
     args: argparse.Namespace,
     floor_index: int,
@@ -5045,6 +5136,7 @@ def generate_floor_staged_with_retries(
     economy_output: dict[str, Any] | None = None
     monster_output: dict[str, Any] | None = None
     feedback: dict[str, Any] | None = None
+    feedback_attempt: int | None = None
     repair_stage = "topology"
     repair_stage_outputs: dict[str, dict[str, Any]] = {}
     floor_cache_key = floor_generation_cache_key(
@@ -5084,24 +5176,38 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["topology"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_topology"
-            topology_output = agent_exec(
-                args,
-                build_topology_prompt(
+            try:
+                topology_output = agent_exec(
                     args,
-                    brief,
-                    floor_index,
-                    floor_count,
-                    used,
-                    limits,
-                    accepted_summaries,
-                    feedback if active_repair_stage == "topology" else None,
-                    floor_policy,
-                    floor_contract,
-                    repair_stage_outputs.get("topology") if active_repair_stage == "topology" else None,
-                ),
-                STAGED_FLOOR_SCHEMA,
-                stage_prefix.with_suffix(".floor.json"),
-            )
+                    build_topology_prompt(
+                        args,
+                        brief,
+                        floor_index,
+                        floor_count,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        feedback if active_repair_stage == "topology" else None,
+                        floor_policy,
+                        floor_contract,
+                        repair_stage_outputs.get("topology")
+                        if feedback is not None and active_repair_stage == "topology"
+                        else None,
+                    ),
+                    STAGED_FLOOR_SCHEMA,
+                    stage_prefix.with_suffix(".floor.json"),
+                )
+            except Exception as exc:  # noqa: BLE001 - retry the staged floor on agent/reviewer errors.
+                write_stage_exception_or_raise(stage_prefix, floor_index, attempt, args.max_attempts, "topology", exc)
+                retry_stage = retry_stage_after_exception("topology")
+                feedback = feedback_after_exception(
+                    feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                )
+                if feedback is None:
+                    repair_stage_outputs.clear()
+                repair_stage = retry_stage
+                print(stage_exception_retry_message(floor_index, "topology", attempt, args.max_attempts, exc))
+                continue
             write_json(stage_prefix.with_suffix(".floor.json"), topology_output)
             write_floor_checkpoint(
                 args,
@@ -5114,23 +5220,37 @@ def generate_floor_staged_with_retries(
             if final_attempt:
                 topology_review = forced_accept_review(floor_index, attempt, "topology")
             else:
-                topology_review = run_staged_review(
-                    args,
-                    stage_prefix,
-                    "topology",
-                    brief,
-                    topology_output,
-                    used,
-                    limits,
-                    accepted_summaries,
-                    accepted_floors,
-                    floor_size,
-                    maps,
-                    enemys,
-                    floor_policy,
-                    floor_contract,
-                    False,
-                )
+                try:
+                    topology_review = run_staged_review(
+                        args,
+                        stage_prefix,
+                        "topology",
+                        brief,
+                        topology_output,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        accepted_floors,
+                        floor_size,
+                        maps,
+                        enemys,
+                        floor_policy,
+                        floor_contract,
+                        False,
+                    )
+                except Exception as exc:  # noqa: BLE001 - continue with attempt+1 when reviewer fails.
+                    write_stage_exception_or_raise(
+                        stage_prefix, floor_index, attempt, args.max_attempts, "topology", exc
+                    )
+                    retry_stage = retry_stage_after_exception("topology")
+                    feedback = feedback_after_exception(
+                        feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                    )
+                    if feedback is None:
+                        repair_stage_outputs.clear()
+                    repair_stage = retry_stage
+                    print(stage_exception_retry_message(floor_index, "topology", attempt, args.max_attempts, exc))
+                    continue
             write_json(stage_prefix.with_suffix(".review.json"), topology_review)
             write_floor_checkpoint(
                 args,
@@ -5143,6 +5263,7 @@ def generate_floor_staged_with_retries(
             )
             if not final_attempt and topology_review.get("status") != "pass":
                 feedback = topology_review
+                feedback_attempt = attempt
                 repair_stage_outputs["topology"] = topology_output
                 repair_stage = earliest_repair_stage(topology_review, "topology")
                 print(review_retry_message(floor_index, "topology", attempt, topology_review.get("summary", "")))
@@ -5153,25 +5274,39 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["economy"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_economy"
-            economy_output = agent_exec(
-                args,
-                build_economy_prompt(
+            try:
+                economy_output = agent_exec(
                     args,
-                    brief,
-                    floor_index,
-                    floor_count,
-                    used,
-                    limits,
-                    accepted_summaries,
-                    topology_output,
-                    feedback if active_repair_stage == "economy" else None,
-                    floor_policy,
-                    floor_contract,
-                    repair_stage_outputs.get("economy") if active_repair_stage == "economy" else None,
-                ),
-                STAGED_FLOOR_SCHEMA,
-                stage_prefix.with_suffix(".floor.json"),
-            )
+                    build_economy_prompt(
+                        args,
+                        brief,
+                        floor_index,
+                        floor_count,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        topology_output,
+                        feedback if active_repair_stage == "economy" else None,
+                        floor_policy,
+                        floor_contract,
+                        repair_stage_outputs.get("economy")
+                        if feedback is not None and active_repair_stage == "economy"
+                        else None,
+                    ),
+                    STAGED_FLOOR_SCHEMA,
+                    stage_prefix.with_suffix(".floor.json"),
+                )
+            except Exception as exc:  # noqa: BLE001 - retry the staged floor on agent/reviewer errors.
+                write_stage_exception_or_raise(stage_prefix, floor_index, attempt, args.max_attempts, "economy", exc)
+                retry_stage = retry_stage_after_exception("economy")
+                feedback = feedback_after_exception(
+                    feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                )
+                if feedback is None:
+                    repair_stage_outputs.clear()
+                repair_stage = retry_stage
+                print(stage_exception_retry_message(floor_index, "economy", attempt, args.max_attempts, exc))
+                continue
             write_json(stage_prefix.with_suffix(".floor.json"), economy_output)
             write_floor_checkpoint(
                 args,
@@ -5184,24 +5319,38 @@ def generate_floor_staged_with_retries(
             if final_attempt:
                 economy_review = forced_accept_review(floor_index, attempt, "economy")
             else:
-                economy_review = run_staged_review(
-                    args,
-                    stage_prefix,
-                    "economy",
-                    brief,
-                    economy_output,
-                    used,
-                    limits,
-                    accepted_summaries,
-                    accepted_floors,
-                    floor_size,
-                    maps,
-                    enemys,
-                    floor_policy,
-                    floor_contract,
-                    enforce_resource_progression,
-                    topology_output=topology_output,
-                )
+                try:
+                    economy_review = run_staged_review(
+                        args,
+                        stage_prefix,
+                        "economy",
+                        brief,
+                        economy_output,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        accepted_floors,
+                        floor_size,
+                        maps,
+                        enemys,
+                        floor_policy,
+                        floor_contract,
+                        enforce_resource_progression,
+                        topology_output=topology_output,
+                    )
+                except Exception as exc:  # noqa: BLE001 - continue with attempt+1 when reviewer fails.
+                    write_stage_exception_or_raise(
+                        stage_prefix, floor_index, attempt, args.max_attempts, "economy", exc
+                    )
+                    retry_stage = retry_stage_after_exception("economy")
+                    feedback = feedback_after_exception(
+                        feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                    )
+                    if feedback is None:
+                        repair_stage_outputs.clear()
+                    repair_stage = retry_stage
+                    print(stage_exception_retry_message(floor_index, "economy", attempt, args.max_attempts, exc))
+                    continue
             write_json(stage_prefix.with_suffix(".review.json"), economy_review)
             write_floor_checkpoint(
                 args,
@@ -5214,6 +5363,7 @@ def generate_floor_staged_with_retries(
             )
             if not final_attempt and economy_review.get("status") != "pass":
                 feedback = economy_review
+                feedback_attempt = attempt
                 repair_stage_outputs["economy"] = economy_output
                 repair_stage = earliest_repair_stage(economy_review, "economy")
                 print(review_retry_message(floor_index, "economy", attempt, economy_review.get("summary", "")))
@@ -5224,25 +5374,39 @@ def generate_floor_staged_with_retries(
 
         if stage_start <= STAGE_ORDER["monster"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_monster"
-            monster_output = agent_exec(
-                args,
-                build_monster_special_prompt(
+            try:
+                monster_output = agent_exec(
                     args,
-                    brief,
-                    floor_index,
-                    floor_count,
-                    used,
-                    limits,
-                    accepted_summaries,
-                    economy_output,
-                    feedback if active_repair_stage == "monster" else None,
-                    floor_policy,
-                    floor_contract,
-                    repair_stage_outputs.get("monster") if active_repair_stage == "monster" else None,
-                ),
-                STAGED_FLOOR_SCHEMA,
-                stage_prefix.with_suffix(".floor.json"),
-            )
+                    build_monster_special_prompt(
+                        args,
+                        brief,
+                        floor_index,
+                        floor_count,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        economy_output,
+                        feedback if active_repair_stage == "monster" else None,
+                        floor_policy,
+                        floor_contract,
+                        repair_stage_outputs.get("monster")
+                        if feedback is not None and active_repair_stage == "monster"
+                        else None,
+                    ),
+                    STAGED_FLOOR_SCHEMA,
+                    stage_prefix.with_suffix(".floor.json"),
+                )
+            except Exception as exc:  # noqa: BLE001 - retry the staged floor on agent/reviewer errors.
+                write_stage_exception_or_raise(stage_prefix, floor_index, attempt, args.max_attempts, "monster", exc)
+                retry_stage = retry_stage_after_exception("monster")
+                feedback = feedback_after_exception(
+                    feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                )
+                if feedback is None:
+                    repair_stage_outputs.clear()
+                repair_stage = retry_stage
+                print(stage_exception_retry_message(floor_index, "monster", attempt, args.max_attempts, exc))
+                continue
             apply_brief_required_events(brief, monster_output)
             write_json(stage_prefix.with_suffix(".floor.json"), monster_output)
             write_floor_checkpoint(
@@ -5256,10 +5420,89 @@ def generate_floor_staged_with_retries(
             if final_attempt:
                 monster_review = forced_accept_review(floor_index, attempt, "monster")
             else:
-                monster_review = run_staged_review(
+                try:
+                    monster_review = run_staged_review(
+                        args,
+                        stage_prefix,
+                        "monster",
+                        brief,
+                        monster_output,
+                        used,
+                        limits,
+                        accepted_summaries,
+                        accepted_floors,
+                        floor_size,
+                        maps,
+                        enemys,
+                        floor_policy,
+                        floor_contract,
+                        enforce_resource_progression,
+                        topology_output=topology_output,
+                        economy_output=economy_output,
+                    )
+                except Exception as exc:  # noqa: BLE001 - continue with attempt+1 when reviewer fails.
+                    write_stage_exception_or_raise(
+                        stage_prefix, floor_index, attempt, args.max_attempts, "monster", exc
+                    )
+                    retry_stage = retry_stage_after_exception("monster")
+                    feedback = feedback_after_exception(
+                        feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+                    )
+                    if feedback is None:
+                        repair_stage_outputs.clear()
+                    repair_stage = retry_stage
+                    print(stage_exception_retry_message(floor_index, "monster", attempt, args.max_attempts, exc))
+                    continue
+            write_json(stage_prefix.with_suffix(".review.json"), monster_review)
+            write_floor_checkpoint(
+                args,
+                floor_index,
+                attempt,
+                "monster",
+                monster_output,
+                monster_review,
+                stage_prefix.with_suffix(".floor.json"),
+            )
+            if not final_attempt and monster_review.get("status") != "pass":
+                feedback = monster_review
+                feedback_attempt = attempt
+                repair_stage_outputs["monster"] = monster_output
+                repair_stage = earliest_repair_stage(monster_review, "monster")
+                print(review_retry_message(floor_index, "monster", attempt, monster_review.get("summary", "")))
+                continue
+
+        if monster_output is None:
+            raise PipelineError(f"MT{floor_index} staged pipeline missing monster output.")
+
+        integration_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_integration"
+        try:
+            if final_attempt:
+                expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
+                try:
+                    forced_issues, forced_delta = local_floor_review(
+                        monster_output,
+                        expected_floor_id,
+                        floor_size,
+                        brief,
+                        maps,
+                        enemys,
+                        floor_policy,
+                    )
+                except PipelineError as exc:
+                    forced_issues = [str(exc)]
+                    forced_delta = normalize_delta(None)
+                integration_review = forced_accept_review(
+                    floor_index,
+                    attempt,
+                    "integration",
+                    forced_delta,
+                    forced_issues,
+                )
+            else:
+                integration_review = run_staged_review(
                     args,
-                    stage_prefix,
-                    "monster",
+                    integration_prefix,
+                    "integration",
                     brief,
                     monster_output,
                     used,
@@ -5275,69 +5518,28 @@ def generate_floor_staged_with_retries(
                     topology_output=topology_output,
                     economy_output=economy_output,
                 )
-            write_json(stage_prefix.with_suffix(".review.json"), monster_review)
-            write_floor_checkpoint(
-                args,
-                floor_index,
-                attempt,
-                "monster",
-                monster_output,
-                monster_review,
-                stage_prefix.with_suffix(".floor.json"),
+        except Exception as exc:  # noqa: BLE001 - integration reviewer has no generator, retry from monster.
+            write_stage_exception_or_raise(
+                integration_prefix, floor_index, attempt, args.max_attempts, "integration", exc
             )
-            if not final_attempt and monster_review.get("status") != "pass":
-                feedback = monster_review
-                repair_stage_outputs["monster"] = monster_output
-                repair_stage = earliest_repair_stage(monster_review, "monster")
-                print(review_retry_message(floor_index, "monster", attempt, monster_review.get("summary", "")))
-                continue
-
-        if monster_output is None:
-            raise PipelineError(f"MT{floor_index} staged pipeline missing monster output.")
-
-        integration_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_integration"
-        if final_attempt:
-            expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
-            try:
-                forced_issues, forced_delta = local_floor_review(
-                    monster_output,
-                    expected_floor_id,
-                    floor_size,
-                    brief,
-                    maps,
-                    enemys,
-                    floor_policy,
+            retry_stage = retry_stage_after_exception("integration")
+            feedback = feedback_after_exception(
+                feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
+            )
+            if feedback is None:
+                repair_stage_outputs.clear()
+            repair_stage = retry_stage
+            print(
+                stage_exception_retry_message(
+                    floor_index,
+                    "integration",
+                    attempt,
+                    args.max_attempts,
+                    exc,
+                    retry_stage,
                 )
-            except PipelineError as exc:
-                forced_issues = [str(exc)]
-                forced_delta = normalize_delta(None)
-            integration_review = forced_accept_review(
-                floor_index,
-                attempt,
-                "integration",
-                forced_delta,
-                forced_issues,
             )
-        else:
-            integration_review = run_staged_review(
-                args,
-                integration_prefix,
-                "integration",
-                brief,
-                monster_output,
-                used,
-                limits,
-                accepted_summaries,
-                accepted_floors,
-                floor_size,
-                maps,
-                enemys,
-                floor_policy,
-                floor_contract,
-                enforce_resource_progression,
-                topology_output=topology_output,
-                economy_output=economy_output,
-            )
+            continue
         write_json(integration_prefix.with_suffix(".review.json"), integration_review)
         write_floor_checkpoint(
             args,
@@ -5364,6 +5566,7 @@ def generate_floor_staged_with_retries(
             return result
 
         feedback = integration_review
+        feedback_attempt = attempt
         repair_stage_outputs["topology"] = topology_output
         repair_stage_outputs["economy"] = economy_output
         repair_stage_outputs["monster"] = monster_output
@@ -6603,6 +6806,82 @@ def self_test(repo_root: Path) -> int:
             globals()["agent_exec"] = original_agent_exec
         assert is_forced_accept_review(forced_result["review"])
         assert len(fake_calls) == 3
+
+    with tempfile.TemporaryDirectory() as retry_tmp:
+        retry_args = argparse.Namespace(
+            repo_root=repo_root,
+            out_dir=Path(retry_tmp),
+            floor_prefix="MT",
+            floor_number_offset=0,
+            max_attempts=3,
+            no_generation_cache=True,
+            max_wall_similarity=MAX_ADJACENT_WALL_MASK_SIMILARITY,
+            wall_ratio_min=DEFAULT_WALL_RATIO_MIN,
+            wall_ratio_max=DEFAULT_WALL_RATIO_MAX,
+        )
+        retry_stage_outputs = [
+            core_clone(topology_floor_output),
+            core_clone(economy_floor_output),
+            core_clone(monster_floor_output),
+        ]
+        retry_calls: list[str] = []
+        retry_prompts: dict[str, str] = {}
+
+        def retry_agent_exec(
+            _args: argparse.Namespace,
+            _prompt: str,
+            schema: dict[str, Any],
+            output_path: Path,
+        ) -> dict[str, Any]:
+            retry_calls.append(output_path.name)
+            retry_prompts[output_path.name] = _prompt
+            if output_path.name == "MT0_attempt1_topology.floor.json":
+                raise PipelineError("simulated topology generator failure")
+            if schema is STRUCTURED_REVIEW_SCHEMA:
+                return structured_review("topology", [], empty_budget(), "LLM review passed.")
+            return retry_stage_outputs.pop(0)
+
+        globals()["agent_exec"] = retry_agent_exec
+        try:
+            retry_result = generate_floor_staged_with_retries(
+                retry_args,
+                sample_brief,
+                0,
+                1,
+                9,
+                maps,
+                enemys,
+                empty_budget(),
+                {key: None for key in TRACKED_RESOURCES},
+                [],
+                [],
+                {},
+                None,
+                False,
+            )
+        finally:
+            globals()["agent_exec"] = original_agent_exec
+        retry_error = load_json_object(
+            (Path(retry_tmp) / "floors" / "MT0_attempt1_topology.error.json").read_text(encoding="utf-8")
+        )
+        assert retry_error["status"] == "error"
+        assert retry_error["failed_stage"] == "topology"
+        assert not (Path(retry_tmp) / "floors" / "MT0_attempt1_topology.review.json").exists()
+        assert "MT0_attempt2_topology.floor.json" in retry_calls
+        assert "MT0_attempt2_topology.review.topology.json" in retry_calls
+        assert "MT0_attempt2_integration.review.integration.json" in retry_calls
+        assert "simulated topology generator failure" not in retry_prompts["MT0_attempt2_topology.floor.json"]
+        assert '"repair_feedback": {}' in retry_prompts["MT0_attempt2_topology.floor.json"]
+        assert retry_result["review"]["status"] == "pass"
+        assert not is_forced_accept_review(retry_result["review"])
+
+    previous_feedback = structured_review(
+        "topology",
+        [structured_issue("topology", "fail", "route graph is too linear", "Add route branches.")],
+    )
+    assert feedback_after_exception(previous_feedback, 1, 2, "topology", "topology") is previous_feedback
+    assert feedback_after_exception(previous_feedback, 1, 3, "topology", "topology") is None
+    assert feedback_after_exception(previous_feedback, 1, 2, "economy", "monster") is None
 
     integration_review = structured_review(
         "integration",
