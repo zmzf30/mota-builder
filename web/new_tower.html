@@ -35,6 +35,13 @@
                 <span>地图尺寸（固定 13 x 13）</span>
                 <input id="floorSize" name="floorSize" type="number" value="13" readonly />
               </label>
+              <label class="field">
+                <span>地图风格</span>
+                <select id="towerStyle" name="towerStyle">
+                  <option value="traditional" selected>传统塔</option>
+                  <option value="red_sea">红海塔</option>
+                </select>
+              </label>
             </div>
             <button id="confirmScale" class="primary" type="button">确认规模</button>
           </section>
@@ -54,7 +61,7 @@
               <label class="field"><span>对称飞</span><input name="initialCenterFly" type="number" min="0" step="1" value="0" required /></label>
               <label class="field"><span>炸弹</span><input name="initialBomb" type="number" min="0" step="1" value="0" required /></label>
               <label class="field"><span>跳跃靴</span><input name="initialJumpShoes" type="number" min="0" step="1" value="0" required /></label>
-              <label class="field"><span>怪物手册</span><input name="initialBook" type="number" min="0" step="1" value="1" required /></label>
+              <label class="field"><span>怪物手册（固定）</span><input name="initialBook" type="number" min="1" max="1" step="1" value="1" readonly required /></label>
               <label class="field"><span>黄钥匙</span><input name="initialYellowKey" type="number" min="0" step="1" value="0" required /></label>
               <label class="field"><span>蓝钥匙</span><input name="initialBlueKey" type="number" min="0" step="1" value="0" required /></label>
             </div>
@@ -65,15 +72,15 @@
               <label class="field"><span>蓝门</span><input class="resource-input" name="blueDoors" type="number" min="0" step="1" value="8" required /></label>
               <label class="field"><span>黄钥匙</span><input class="resource-input" name="yellowKeys" type="number" min="0" step="1" value="8" required /></label>
               <label class="field"><span>蓝钥匙</span><input class="resource-input" name="blueKeys" type="number" min="0" step="1" value="4" required /></label>
-              <label class="field"><span>破墙镐</span><input class="resource-input" name="pickaxes" type="number" min="0" step="1" value="4" required /></label>
-              <label class="field"><span>炸弹</span><input class="resource-input" name="bombs" type="number" min="0" step="1" value="4" required /></label>
-              <label class="field"><span>对称飞</span><input class="resource-input" name="centerFly" type="number" min="0" step="1" value="4" required /></label>
+              <label class="field"><span>破墙镐</span><input class="resource-input" name="pickaxes" type="number" min="0" step="1" value="2" required /></label>
+              <label class="field"><span>炸弹</span><input class="resource-input" name="bombs" type="number" min="0" step="1" value="2" required /></label>
+              <label class="field"><span>对称飞</span><input class="resource-input" name="centerFly" type="number" min="0" step="1" value="2" required /></label>
               <label class="field"><span>跳跃靴</span><input class="resource-input" name="jumpShoes" type="number" min="0" step="1" value="0" required /></label>
-              <label class="field"><span>红宝石</span><input class="resource-input" name="redGems" type="number" min="0" step="1" value="20" required /></label>
-              <label class="field"><span>蓝宝石</span><input class="resource-input" name="blueGems" type="number" min="0" step="1" value="20" required /></label>
+              <label class="field"><span>红宝石</span><input class="resource-input" name="redGems" type="number" min="0" step="1" value="24" required /></label>
+              <label class="field"><span>蓝宝石</span><input class="resource-input" name="blueGems" type="number" min="0" step="1" value="24" required /></label>
               <label class="field"><span>绿宝石</span><input class="resource-input" name="greenGems" type="number" min="0" step="1" value="0" required /></label>
-              <label class="field"><span>红血瓶</span><input class="resource-input" name="redPotions" type="number" min="0" step="1" value="20" required /></label>
-              <label class="field"><span>蓝血瓶</span><input class="resource-input" name="bluePotions" type="number" min="0" step="1" value="8" required /></label>
+              <label class="field"><span>红血瓶</span><input class="resource-input" name="redPotions" type="number" min="0" step="1" value="24" required /></label>
+              <label class="field"><span>蓝血瓶</span><input class="resource-input" name="bluePotions" type="number" min="0" step="1" value="4" required /></label>
               <label class="field"><span>黄血瓶</span><input class="resource-input" name="yellowPotions" type="number" min="0" step="1" value="0" required /></label>
               <label class="field"><span>绿血瓶</span><input class="resource-input" name="greenPotions" type="number" min="0" step="1" value="0" required /></label>
             </div>
@@ -117,12 +124,12 @@
                   <input id="floorConcurrency" name="floorConcurrency" type="number" min="1" max="4" step="1" value="4" required />
                   <small id="resumeConcurrencyHint" class="field-hint" hidden>继续上次生成会按楼层顺序修复，不能并发。</small>
                 </label>
-                <label class="field"><span>怪物下限</span><input name="enemyMin" type="number" min="1" max="60" step="1" value="22" required /></label>
-                <label class="field"><span>怪物上限</span><input name="enemyMax" type="number" min="1" max="60" step="1" value="33" required /></label>
+                <label class="field"><span>怪物下限</span><input name="enemyMin" type="number" min="1" max="60" step="1" value="18" required /></label>
+                <label class="field"><span>怪物上限</span><input name="enemyMax" type="number" min="1" max="60" step="1" value="28" required /></label>
                 <label class="field"><span>相似度上限</span><input name="maxWallSimilarity" type="number" min="0.1" max="1" step="0.01" value="0.9" required /></label>
-                <label class="field"><span>墙比例下限</span><input name="wallRatioMin" type="number" min="0.1" max="0.9" step="0.01" value="0.5" required /></label>
-                <label class="field"><span>墙比例上限</span><input name="wallRatioMax" type="number" min="0.1" max="0.9" step="0.01" value="0.6" required /></label>
-                <label class="field"><span>怪物种类上限/层</span><input name="monsterTypesPerFloor" type="number" min="1" max="30" step="1" value="12" required /></label>
+                <label class="field"><span>墙比例下限</span><input name="wallRatioMin" type="number" min="0.1" max="0.9" step="0.01" value="0.35" required /></label>
+                <label class="field"><span>墙比例上限</span><input name="wallRatioMax" type="number" min="0.1" max="0.9" step="0.01" value="0.45" required /></label>
+                <label class="field"><span>怪物种类上限/层</span><input name="monsterTypesPerFloor" type="number" min="1" max="30" step="1" value="9" required /></label>
                 <label class="field"><span>每怪特殊上限</span><input name="maxSpecialsPerMonster" type="number" min="1" max="3" step="1" value="1" required /></label>
                 <label class="field"><span>楼层怪物重叠率</span><input name="floorOverlapRatio" type="number" min="0" max="1" step="0.01" value="0.7" required /></label>
                 <label class="field"><span>领域/阻击伤害下限</span><input name="specialDamageValueMin" type="number" min="0" step="1" value="50" required /></label>

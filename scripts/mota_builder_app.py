@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import errno
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -13,6 +14,7 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -45,6 +47,15 @@ TIMEOUT_OPTIONS = {10, 20, 30, 60, 90, 120}
 RESUME_CONTROL_FIELDS = ("maxAttempts", "agentBackend", "timeoutMinutes")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
+DEFAULT_UI_PORT = 8765
+UI_PORT_SEARCH_LIMIT = 100
+TRACKED_RESOURCE_KEYS = (
+    "yellow_doors", "blue_doors", "red_doors",
+    "yellow_keys", "blue_keys", "red_keys",
+    "pickaxes", "bombs", "centerFly", "jumpShoes",
+    "redGems", "blueGems", "greenGems",
+    "redPotions", "bluePotions", "yellowPotions", "greenPotions",
+)
 STAGE_LABELS = {
     "topology": "地图结构",
     "economy": "资源和路线",
@@ -304,11 +315,26 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         errors.append("地图尺寸固定为 13x13。")
 
     agent_backend = str(form.get("agentBackend") or "codex")
+    tower_style = str(form.get("towerStyle") or "traditional")
+    if tower_style not in {"traditional", "red_sea"}:
+        errors.append("塔风格只能选择传统塔或红海塔。")
+        tower_style = "traditional"
+    style_wall_defaults = {
+        "traditional": (0.35, 0.45),
+        "red_sea": (0.45, 0.55),
+    }
+    style_enemy_defaults = {
+        "traditional": (18, 28),
+        "red_sea": (22, 33),
+    }
+    default_wall_min, default_wall_max = style_wall_defaults[tower_style]
+    default_enemy_min, default_enemy_max = style_enemy_defaults[tower_style]
     default_max_attempts = OPENCODE_DEFAULT_MAX_ATTEMPTS if agent_backend == "opencode" else DEFAULT_MAX_ATTEMPTS
-    defaults = default_resources(floors)
+    defaults = default_resources(floors, tower_style)
     normalized: dict[str, Any] = {
         "floors": floors,
         "floorSize": 13,
+        "towerStyle": tower_style,
         "hp": int_field(form, "hp", "HP", 300, 1, None, errors),
         "atk": int_field(form, "atk", "ATK", 10, 0, None, errors),
         "defense": int_field(form, "defense", "DEF", 10, 0, None, errors),
@@ -316,7 +342,7 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         "initialCenterFly": int_field(form, "initialCenterFly", "初始中心对称飞行器", 0, 0, None, errors),
         "initialBomb": int_field(form, "initialBomb", "初始炸弹", 0, 0, None, errors),
         "initialJumpShoes": int_field(form, "initialJumpShoes", "初始跳跃靴", 0, 0, None, errors),
-        "initialBook": int_field(form, "initialBook", "初始怪物手册", 1, 0, None, errors),
+        "initialBook": 1,
         "initialYellowKey": int_field(form, "initialYellowKey", "初始黄钥匙", 0, 0, None, errors),
         "initialBlueKey": int_field(form, "initialBlueKey", "初始蓝钥匙", 0, 0, None, errors),
         "yellowDoors": int_field(form, "yellowDoors", "黄门", defaults["yellowDoors"], 0, None, errors),
@@ -343,12 +369,12 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         "greenPotion": int_field(form, "greenPotion", "绿血瓶 HP", 400, 0, None, errors),
         "maxAttempts": int_field(form, "maxAttempts", "最大尝试次数", default_max_attempts, 1, 10, errors),
         "floorConcurrency": int_field(form, "floorConcurrency", "并发数", min(4, floors), 1, 4, errors),
-        "enemyMin": int_field(form, "enemyMin", "每层怪物数量下限", 22, 1, 60, errors),
-        "enemyMax": int_field(form, "enemyMax", "每层怪物数量上限", 33, 1, 60, errors),
+        "enemyMin": int_field(form, "enemyMin", "每层怪物数量下限", default_enemy_min, 1, 60, errors),
+        "enemyMax": int_field(form, "enemyMax", "每层怪物数量上限", default_enemy_max, 1, 60, errors),
         "maxWallSimilarity": float_field(form, "maxWallSimilarity", "层相似度上限", 0.9, 0.1, 1.0, errors),
-        "wallRatioMin": float_field(form, "wallRatioMin", "墙比例下限", 0.5, 0.1, 0.9, errors),
-        "wallRatioMax": float_field(form, "wallRatioMax", "墙比例上限", 0.6, 0.1, 0.9, errors),
-        "monsterTypesPerFloor": int_field(form, "monsterTypesPerFloor", "每层怪物种类上限", 12, 1, 30, errors),
+        "wallRatioMin": float_field(form, "wallRatioMin", "墙比例下限", default_wall_min, 0.1, 0.9, errors),
+        "wallRatioMax": float_field(form, "wallRatioMax", "墙比例上限", default_wall_max, 0.1, 0.9, errors),
+        "monsterTypesPerFloor": int_field(form, "monsterTypesPerFloor", "每层怪物种类上限", 9, 1, 30, errors),
         "maxSpecialsPerMonster": int_field(form, "maxSpecialsPerMonster", "每怪特殊能力上限", 1, 1, 3, errors),
         "floorOverlapRatio": float_field(form, "floorOverlapRatio", "楼层怪物重叠率", 0.7, 0.0, 1.0, errors),
         "specialDamageMin": float_field(form, "specialDamageMin", "领域/阻击伤害下限倍率", 0.5, 0.0, None, errors),
@@ -431,24 +457,63 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def default_resources(floors: int) -> dict[str, int]:
+def default_resources(floors: int, tower_style: str = "traditional") -> dict[str, int]:
+    if tower_style == "traditional":
+        tool_total = max(1, (floors * 3 + 1) // 2)
+        pickaxes = (tool_total + 2) // 3
+        bombs = (tool_total + 1) // 3
+        center_fly = tool_total // 3
+    else:
+        pickaxes = floors
+        bombs = floors
+        center_fly = floors
     return {
         "yellowDoors": floors * 4,
         "blueDoors": floors * 2,
         "yellowKeys": floors * 2,
         "blueKeys": floors,
-        "pickaxes": floors,
-        "bombs": floors,
-        "centerFly": floors,
+        "pickaxes": pickaxes,
+        "bombs": bombs,
+        "centerFly": center_fly,
         "jumpShoes": 0,
-        "redGems": floors * 5,
-        "blueGems": floors * 5,
+        "redGems": floors * 6,
+        "blueGems": floors * 6,
         "greenGems": 0,
-        "redPotions": floors * 5,
-        "bluePotions": floors * 2,
+        "redPotions": floors * 6,
+        "bluePotions": floors,
         "yellowPotions": 0,
         "greenPotions": 0,
     }
+
+
+def default_floor_progression_plan(
+    global_limits: dict[str, int],
+    floors: int,
+) -> list[dict[str, Any]]:
+    floor_count = max(int(floors), 1)
+    plan: list[dict[str, Any]] = []
+    for floor_index in range(floor_count):
+        resource_budget = {}
+        for key in TRACKED_RESOURCE_KEYS:
+            total = max(int(global_limits.get(key, 0)), 0)
+            base, remainder = divmod(total, floor_count)
+            resource_budget[key] = base + (1 if floor_index < remainder else 0)
+        role = "入口层" if floor_index == 0 else "最终层" if floor_index == floor_count - 1 else "中间层"
+        plan.append(
+            {
+                "floor_index": floor_index,
+                "role": role,
+                "resource_budget": resource_budget,
+                "route_archetypes": ["主通路", "钥匙承诺支路", "受保护资源支路"],
+                "key_door_arc": "用黄门形成频繁选择，用蓝门形成区域承诺，并允许钥匙跨层保留。",
+                "resource_access_arc": "少量启动资源可直接取得，其余资源分布在门、战斗或绕行成本之后。",
+                "combat_threshold_arc": "至少一个可取得的红蓝宝石应明显改变后续可选战斗的效率。",
+                "tool_arc": "工具必须对应清晰的获取成本或路线收益，不作装饰。",
+                "carry_forward_intent": "保留钥匙、属性或工具中的至少一种跨层取舍。",
+                "reference_patterns": [],
+            }
+        )
+    return plan
 
 
 def build_brief(form: dict[str, Any]) -> dict[str, Any]:
@@ -457,7 +522,8 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
     floor_size = safe_int(form_value(form, "floorSize"), 13, 9, 13)
     if floor_size not in {9, 11, 13}:
         floor_size = 13
-    resources = default_resources(floors)
+    tower_style = str(form_value(form, "towerStyle", "traditional"))
+    resources = default_resources(floors, tower_style)
     allowed_specials = form_value(form, "allowedSpecials", [1, 2, 3, 15, 18])
     if not isinstance(allowed_specials, list):
         allowed_specials = [1, 2, 3, 15, 18]
@@ -470,10 +536,11 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("至少选择一个怪物能力。")
 
     description = str(form_value(form, "description", "") or "").strip()
-    enemy_min = safe_int(form_value(form, "enemyMin"), 22, 0, 120)
-    enemy_max = safe_int(form_value(form, "enemyMax"), 33, enemy_min, 160)
-    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.5, 0.1, 0.9)
-    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.6, wall_ratio_min, 0.9)
+    style_name = "传统塔" if tower_style == "traditional" else "红海塔"
+    enemy_min = safe_int(form_value(form, "enemyMin"), 18 if tower_style == "traditional" else 22, 0, 120)
+    enemy_max = safe_int(form_value(form, "enemyMax"), 28 if tower_style == "traditional" else 33, enemy_min, 160)
+    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.35 if tower_style == "traditional" else 0.45, 0.1, 0.9)
+    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.45 if tower_style == "traditional" else 0.55, wall_ratio_min, 0.9)
     special_damage_min = safe_float(form_value(form, "specialDamageMin"), 0.5, 0.0)
     special_damage_max = safe_float(form_value(form, "specialDamageMax"), 1.0, special_damage_min)
     gem_delta_min = safe_float(form_value(form, "gemFloorDeltaMin"), 0.0, 0.0, 10.0)
@@ -505,11 +572,12 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
         "bomb": safe_int(form_value(form, "initialBomb"), 0, 0),
         "centerFly": safe_int(form_value(form, "initialCenterFly"), 0, 0),
         "jumpShoes": safe_int(form_value(form, "initialJumpShoes"), 0, 0),
-        "book": safe_int(form_value(form, "initialBook"), 1, 0),
+        "book": 1,
     }
     fixed_rules = [
         f"{floor_size}x{floor_size} floors",
         f"{floors} floors",
+        f"tower style: {tower_style}",
         "traditional key-door route pressure",
         "low story; prioritize playable routes, resource pressure, and branch choices",
         "do not use red doors or red keys unless the user later adds them explicitly",
@@ -526,7 +594,7 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
     }
     special_summary = "、".join(f"{item}{special_names[item]}" for item in allowed_specials)
     summary_parts = [
-        f"{floors}层 {floor_size}x{floor_size} 传统魔塔",
+        f"{floors}层 {floor_size}x{floor_size} {style_name}",
         f"初始 HP {safe_int(form_value(form, 'hp'), 300, 1)} / ATK {safe_int(form_value(form, 'atk'), 10, 0)} / DEF {safe_int(form_value(form, 'defense'), 10, 0)}",
         (
             f"整塔资源：黄门 {global_limits['yellow_doors']}、蓝门 {global_limits['blue_doors']}、"
@@ -542,6 +610,7 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": "ready",
         "summary": "；".join(summary_parts),
+        "tower_style": tower_style,
         "floor_count": floors,
         "floor_size": floor_size,
         "fixed_rules": fixed_rules,
@@ -581,7 +650,7 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
             "allowed_specials": allowed_specials,
             "max_specials_per_monster": safe_int(form_value(form, "maxSpecialsPerMonster"), 1, 1, 3),
             "min_no_special_ratio": None,
-            "monster_types_per_floor": safe_int(form_value(form, "monsterTypesPerFloor"), 12, 1, 30),
+            "monster_types_per_floor": safe_int(form_value(form, "monsterTypesPerFloor"), 9, 1, 30),
             "enemy_count_min_per_floor": enemy_min,
             "enemy_count_max_per_floor": enemy_max,
             "floor_overlap_ratio": safe_float(form_value(form, "floorOverlapRatio"), 0.7, 0.0, 1.0),
@@ -602,11 +671,24 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
             "high_value_pocket_threshold": safe_float(form_value(form, "highValuePocketThreshold"), 3.0, 0.0, 20.0),
             "warning": "高级配置会作为生成和校验目标传入，但大模型输出不一定能完全遵循。",
         },
-        "layout_policy": [
-            "每层至少 3 条可感知分支路线",
+        "layout_policy": (
+            [
+                "墙比例 0.35-0.45，区域明显并具有多种分支，每层形成 2-4 条主要路线",
+                "每层设置约 6-20 个有效决策点、18-28 个怪物和 2-6 个特殊压力位置",
+                "工具平均 0.5-2 个/层，重要资源保护率 70%-90%，钥匙和资源安全余量 0%-10%",
+            ]
+            if tower_style == "traditional"
+            else [
+                "使用有实际路线意义的破碎墙和狭窄道路，每层至少 3 条路线",
+                "墙比例 0.45-0.55，每层设置约 10-40 个局部决策点和 22-33 个怪物",
+                "资源分散放置并尽量由门、怪物、路线或现有工具保护",
+            ]
+        ) + [
             "楼层之间拓扑结构要明显不同",
-            "用门、怪物、破墙镐、炸弹和中心对称飞行器制造资源取舍",
+            "风格不代表数值难度，不据此调整怪物 HP、ATK 或 DEF",
+            "不新增夹击、吸血、自爆、灯、箭头、单向通行或自定义脚本机制",
         ],
+        "floor_progression_plan": default_floor_progression_plan(global_limits, floors),
         "questions": [],
         "confirmation_prompt": "确认这个全塔 brief 后开始生成整座塔。",
     }
@@ -614,16 +696,26 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
 
 def build_idea_prompt(form: dict[str, Any]) -> str:
     form = normalize_form(form)
+    style_name = "传统塔" if form["towerStyle"] == "traditional" else "红海塔"
+    if form["towerStyle"] == "traditional":
+        style_rules = """- 墙比例目标 0.35-0.45，区域明显并具有多种分支，每层形成 2-4 条主要路线
+- 每层设置约 6-20 个有效决策点、18-28 个怪物和 2-6 个特殊压力位置
+- 工具平均 0.5-2 个/层，重要资源保护率 70%-90%，钥匙和资源安全余量 0%-10%"""
+    else:
+        style_rules = """- 墙比例目标 0.45-0.55，使用有实际路线意义的破碎墙和狭窄道路，每层至少 3 条路线
+- 每层设置约 10-40 个局部决策点、22-33 个怪物
+- 资源分散放置，并尽量由门、怪物、路线或现有工具保护"""
     special_names = {1: "先攻", 2: "魔攻", 3: "坚固", 15: "领域", 18: "阻击"}
     specials = "、".join(f"{item}{special_names[item]}" for item in form["allowedSpecials"])
     description = form["description"] or "无"
-    return f"""我想直接一步生成一座 {form['floors']} 层、13x13、低剧情、传统钥匙门博弈的魔塔。
+    return f"""我想直接一步生成一座 {form['floors']} 层、13x13、低剧情、传统钥匙门博弈的{style_name}。
 
 请严格使用以下参数，不要自行改动规模和数值口径：
 
 规模：
 - 楼层数：{form['floors']}
 - 地图尺寸：13x13
+- 风格：{form['towerStyle']}（{style_name}）
 
 初始勇士：
 - HP={form['hp']}
@@ -676,12 +768,14 @@ def build_idea_prompt(form: dict[str, Any]) -> str:
 - 领域/阻击伤害范围：{form['specialDamageValueMin']:g} 到 {form['specialDamageValueMax']:g}
 
 布局和体验：
-- 每层至少 3 条可感知分支路线
+{style_rules}
 - 楼层之间墙体结构要明显不同，相邻楼层墙体相似度必须低于 {form['maxWallSimilarity']:.2f}
-- 13x13 拓扑墙比例目标：{form['wallRatioMin']:.2f} 到 {form['wallRatioMax']:.2f}
+- 拓扑墙比例目标：{form['wallRatioMin']:.2f} 到 {form['wallRatioMax']:.2f}
 - 上述高级配置会作为生成和校验目标传入，但由于大模型不确定性，生成结果不一定能完全遵循，需要生成后手动查看和调整
 - 重点体现门钥匙博弈、路线选择、资源取舍、战斗压力
+- 风格只控制地图结构和资源/怪物放置方式，不代表数值难度，不据此推断怪物 HP、ATK、DEF
 - 不做复杂剧情、Boss 事件、自定义脚本或特殊图块
+- 不新增夹击、吸血、自爆、灯、箭头、单向通行等机制
 
 补充描述：
 {description}
@@ -722,6 +816,8 @@ def build_command(
         str(timeout_minutes * 60),
         "--max-wall-similarity",
         str(max_wall_similarity),
+        "--tower-style",
+        form["towerStyle"],
         "--wall-ratio-min",
         str(form["wallRatioMin"]),
         "--wall-ratio-max",
@@ -870,7 +966,19 @@ def status_payload(run_id: str, run_dir: Path, reconcile_process: bool = False) 
     return status
 
 
-def find_latest_resumable_run() -> tuple[str, Path, dict[str, Any]]:
+def ui_instance_id(host: str, port: int) -> str:
+    return f"{host}:{port}"
+
+
+def run_belongs_to_ui_instance(status: dict[str, Any], instance_id: str) -> bool:
+    stored_instance = status.get("ui_instance_id")
+    if isinstance(stored_instance, str) and stored_instance:
+        return stored_instance == instance_id
+    _, separator, raw_port = instance_id.rpartition(":")
+    return bool(separator and raw_port == str(DEFAULT_UI_PORT))
+
+
+def find_latest_resumable_run(instance_id: str) -> tuple[str, Path, dict[str, Any]]:
     if not RUNS_DIR.exists():
         raise ValueError("没有找到可继续的生成记录。")
     candidates = sorted(
@@ -880,6 +988,12 @@ def find_latest_resumable_run() -> tuple[str, Path, dict[str, Any]]:
     )
     for run_dir in candidates:
         run_id = run_dir.name
+        try:
+            status = read_json(status_path(run_dir))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not run_belongs_to_ui_instance(status, instance_id):
+            continue
         with RUN_LOCK:
             if run_id in RUN_PROCESSES:
                 continue
@@ -920,6 +1034,10 @@ def build_resume_command_form(run_dir: Path, current_form: dict[str, Any]) -> di
 def migrate_brief_from_form(brief: dict[str, Any], form: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     form_brief = build_brief(form)
     changed = False
+
+    if brief.get("tower_style") not in {"traditional", "red_sea"}:
+        brief["tower_style"] = form_brief["tower_style"]
+        changed = True
 
     limits = brief.get("global_limits")
     if not isinstance(limits, dict):
@@ -1140,12 +1258,19 @@ def run_build_worker(run_id: str, run_dir: Path, output_dir: Path, cmd: list[str
         )
 
 
-def make_run_id() -> str:
+def allocate_run_dir() -> tuple[str, Path]:
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
     for suffix in range(1000):
         base = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        candidate = base if suffix == 0 else f"{base}-{suffix}"
-        if not run_dir_for(candidate).exists():
-            return candidate
+        candidate = f"{base}-{os.getpid()}-{secrets.token_hex(3)}"
+        if suffix:
+            candidate += f"-{suffix}"
+        run_dir = run_dir_for(candidate)
+        try:
+            run_dir.mkdir(parents=False, exist_ok=False)
+        except FileExistsError:
+            continue
+        return candidate, run_dir
     raise RuntimeError("cannot allocate run id")
 
 
@@ -1323,7 +1448,7 @@ def reconcile_run_status(run_id: str, run_dir: Path, status: dict[str, Any]) -> 
     return status
 
 
-def latest_run_status() -> dict[str, Any] | None:
+def latest_run_status(instance_id: str) -> dict[str, Any] | None:
     if not RUNS_DIR.exists():
         return None
     candidates = sorted(
@@ -1333,6 +1458,12 @@ def latest_run_status() -> dict[str, Any] | None:
     )
     for run_dir in candidates:
         run_id = run_dir.name
+        try:
+            stored_status = read_json(status_path(run_dir))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not run_belongs_to_ui_instance(stored_status, instance_id):
+            continue
         try:
             status = status_payload(run_id, run_dir, reconcile_process=True)
         except (OSError, json.JSONDecodeError, FileNotFoundError):
@@ -1424,6 +1555,9 @@ def safe_join(root: Path, relative: str) -> Path:
 class MotaBuilderHandler(BaseHTTPRequestHandler):
     server_version = "MotaBuilderUI/0.1"
 
+    def current_ui_instance_id(self) -> str:
+        return str(getattr(self.server, "ui_instance_id", ""))
+
     def log_message(self, format: str, *args: Any) -> None:
         sys.stderr.write("%s - %s\n" % (self.log_date_time_string(), format % args))
 
@@ -1484,7 +1618,7 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     return
                 self.send_json(status)
             elif path == "/api/latest-run":
-                status = latest_run_status()
+                status = latest_run_status(self.current_ui_instance_id())
                 if status is None:
                     self.send_json({"state": "missing", "message": "run not found"}, 404)
                 else:
@@ -1522,7 +1656,9 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     raise ValueError("form must be a JSON object")
                 normalized = normalize_form(form)
                 if normalized["resumeExisting"]:
-                    run_id, run_dir, existing_brief = find_latest_resumable_run()
+                    run_id, run_dir, existing_brief = find_latest_resumable_run(
+                        self.current_ui_instance_id()
+                    )
                     input_path = output_dir_for(run_dir) / "tower_brief.json"
                     input_mode = "brief"
                     idea_path = None
@@ -1531,8 +1667,7 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     floor_count = int(existing_brief.get("floor_count") or command_form["floors"])
                 else:
                     idea = build_idea_prompt(normalized)
-                    run_id = make_run_id()
-                    run_dir = run_dir_for(run_id)
+                    run_id, run_dir = allocate_run_dir()
                     PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
                     idea_path = PROMPTS_DIR / f"{run_id}.idea.txt"
                     idea_path.write_text(idea + "\n", encoding="utf-8")
@@ -1542,6 +1677,7 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     command_form = normalized
                 run_dir.mkdir(parents=True, exist_ok=True)
                 request_payload = {
+                    "ui_instance_id": self.current_ui_instance_id(),
                     "form": normalized,
                     "command_form": command_form,
                     "idea_path": str(idea_path) if idea_path is not None else None,
@@ -1558,6 +1694,7 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
                     status_path(run_dir),
                     {
                         "run_id": run_id,
+                        "ui_instance_id": self.current_ui_instance_id(),
                         "state": "queued",
                         "progress": 0,
                         "message": "继续上次未完成生成" if normalized["resumeExisting"] else "排队中",
@@ -1633,11 +1770,52 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
         self.send_file(target)
 
 
+class MotaBuilderServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+    ui_instance_id = ""
+
+
+def bind_ui_server(host: str, preferred_port: int) -> tuple[MotaBuilderServer, int]:
+    candidates = [0] if preferred_port == 0 else range(
+        preferred_port,
+        min(preferred_port + UI_PORT_SEARCH_LIMIT, 65536),
+    )
+    occupied_ports: list[int] = []
+    for port in candidates:
+        try:
+            server = MotaBuilderServer((host, port), MotaBuilderHandler)
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE:
+                raise
+            occupied_ports.append(port)
+            continue
+        actual_port = int(server.server_address[1])
+        server.ui_instance_id = ui_instance_id(host, actual_port)
+        if occupied_ports:
+            tried = ", ".join(str(item) for item in occupied_ports)
+            print(f"Port(s) {tried} already in use; selected {actual_port}.")
+        return server, actual_port
+    raise OSError(
+        errno.EADDRINUSE,
+        f"no available port from {preferred_port} through "
+        f"{min(preferred_port + UI_PORT_SEARCH_LIMIT - 1, 65535)}",
+    )
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the local Mota Builder web UI.")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_UI_PORT,
+        help="Preferred port; occupied ports automatically fall forward (default: 8765).",
+    )
+    args = parser.parse_args(argv)
+    if not 0 <= args.port <= 65535:
+        parser.error("--port must be between 0 and 65535")
+    return args
 
 
 def main(argv: list[str]) -> int:
@@ -1645,8 +1823,8 @@ def main(argv: list[str]) -> int:
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     BRIEFS_DIR.mkdir(parents=True, exist_ok=True)
     PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer((args.host, args.port), MotaBuilderHandler)
-    print(f"Mota Builder UI: http://{args.host}:{args.port}/")
+    server, actual_port = bind_ui_server(args.host, args.port)
+    print(f"Mota Builder UI: http://{args.host}:{actual_port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

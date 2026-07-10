@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Mota Enemy Table"
+  short_description: "Review enemy role tradeoffs and floor balance."
+  default_prompt: "Use $review-mota-enemy-table to review the generated Mota enemy table and floor assignments against projected hero growth."

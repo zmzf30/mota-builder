@@ -24,35 +24,56 @@ const resumeExistingInput = document.getElementById("resumeExisting");
 const resumeConcurrencyHint = document.getElementById("resumeConcurrencyHint");
 const agentBackendInput = form.elements.agentBackend;
 const maxAttemptsInput = form.elements.maxAttempts;
+const towerStyleInput = form.elements.towerStyle;
+const wallRatioMinInput = form.elements.wallRatioMin;
+const wallRatioMaxInput = form.elements.wallRatioMax;
 
 let pollTimer = null;
 let currentRunId = null;
 const touchedResources = new Set();
 const touchedSpecialDamageValues = new Set();
 let maxAttemptsTouched = false;
+let wallRatioTouched = false;
+let enemyCountTouched = false;
 
 const agentMaxAttemptDefaults = {
   codex: 4,
   opencode: 6,
 };
 
-const resourceDefaults = (floors) => ({
+const styleWallDefaults = {
+  traditional: [0.35, 0.45],
+  red_sea: [0.45, 0.55],
+};
+
+const styleEnemyDefaults = {
+  traditional: [18, 28],
+  red_sea: [22, 33],
+};
+
+const resourceDefaults = (floors, towerStyle = "traditional") => {
+  const traditionalToolTotal = Math.max(1, Math.floor(floors * 1.5 + 0.5));
+  const pickaxes = towerStyle === "traditional" ? Math.floor((traditionalToolTotal + 2) / 3) : floors;
+  const bombs = towerStyle === "traditional" ? Math.floor((traditionalToolTotal + 1) / 3) : floors;
+  const centerFly = towerStyle === "traditional" ? Math.floor(traditionalToolTotal / 3) : floors;
+  return {
   yellowDoors: floors * 4,
   blueDoors: floors * 2,
   yellowKeys: floors * 2,
   blueKeys: floors,
-  pickaxes: floors,
-  bombs: floors,
-  centerFly: floors,
+  pickaxes,
+  bombs,
+  centerFly,
   jumpShoes: 0,
-  redGems: floors * 5,
-  blueGems: floors * 5,
+  redGems: floors * 6,
+  blueGems: floors * 6,
   greenGems: 0,
-  redPotions: floors * 5,
-  bluePotions: floors * 2,
+  redPotions: floors * 6,
+  bluePotions: floors,
   yellowPotions: 0,
   greenPotions: 0,
-});
+  };
+};
 
 const stageLabels = {
   topology: "地图结构",
@@ -205,6 +226,9 @@ const validateFormData = (data) => {
   const floors = intValue(data, "floors", "楼层数", 1, 20, errors);
   const floorSize = intValue(data, "floorSize", "地图尺寸", 13, 13, errors);
   if (floorSize !== 13) errors.push("地图尺寸固定为 13x13");
+  if (!["traditional", "red_sea"].includes(String(data.towerStyle || ""))) {
+    errors.push("地图风格只能选择传统塔或红海塔");
+  }
 
   [
     ["hp", "HP", 1],
@@ -214,7 +238,7 @@ const validateFormData = (data) => {
     ["initialCenterFly", "初始中心对称飞行器", 0],
     ["initialBomb", "初始炸弹", 0],
     ["initialJumpShoes", "初始跳跃靴", 0],
-    ["initialBook", "初始怪物手册", 0],
+    ["initialBook", "初始怪物手册", 1],
     ["initialYellowKey", "初始黄钥匙", 0],
     ["initialBlueKey", "初始蓝钥匙", 0],
     ["yellowDoors", "黄门", 0],
@@ -330,7 +354,8 @@ const collectForm = () => {
 
 const applyResourceDefaults = () => {
   const floors = Math.max(1, Number(floorsInput.value) || 4);
-  const defaults = resourceDefaults(floors);
+  const style = String(towerStyleInput?.value || "traditional");
+  const defaults = resourceDefaults(floors, style);
   for (const [name, value] of Object.entries(defaults)) {
     const input = form.elements[name];
     if (input && !touchedResources.has(name)) {
@@ -363,6 +388,21 @@ const syncAgentDefaults = () => {
   if (!agentBackendInput || !maxAttemptsInput || maxAttemptsTouched) return;
   const backend = String(agentBackendInput.value || "codex");
   maxAttemptsInput.value = agentMaxAttemptDefaults[backend] || agentMaxAttemptDefaults.codex;
+};
+
+const syncTowerStyleDefaults = () => {
+  const style = String(towerStyleInput?.value || "traditional");
+  if (!wallRatioTouched) {
+    const [minimum, maximum] = styleWallDefaults[style] || styleWallDefaults.traditional;
+    if (wallRatioMinInput) wallRatioMinInput.value = minimum;
+    if (wallRatioMaxInput) wallRatioMaxInput.value = maximum;
+  }
+  if (!enemyCountTouched) {
+    const [minimum, maximum] = styleEnemyDefaults[style] || styleEnemyDefaults.traditional;
+    if (form.elements.enemyMin) form.elements.enemyMin.value = minimum;
+    if (form.elements.enemyMax) form.elements.enemyMax.value = maximum;
+  }
+  applyResourceDefaults();
 };
 
 const setProgress = (value, message) => {
@@ -556,6 +596,19 @@ maxAttemptsInput?.addEventListener("input", () => {
 });
 
 agentBackendInput?.addEventListener("change", syncAgentDefaults);
+towerStyleInput?.addEventListener("change", syncTowerStyleDefaults);
+
+[wallRatioMinInput, wallRatioMaxInput].forEach((input) => {
+  input?.addEventListener("input", () => {
+    wallRatioTouched = true;
+  });
+});
+
+[form.elements.enemyMin, form.elements.enemyMax].forEach((input) => {
+  input?.addEventListener("input", () => {
+    enemyCountTouched = true;
+  });
+});
 
 resumeExistingInput?.addEventListener("change", syncResumeControls);
 
@@ -575,5 +628,6 @@ initButton.addEventListener("click", initMota);
 applyResourceDefaults();
 applySpecialDamageDefaults();
 syncAgentDefaults();
+syncTowerStyleDefaults();
 syncResumeControls();
 loadHealth().then(restoreLatestRun);

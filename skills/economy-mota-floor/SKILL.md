@@ -11,6 +11,10 @@ Act as stage 2 of a staged per-floor Magic Tower generator.
 
 Start from the topology stage output. Add the floor's economy: doors, keys, resources, tools, and route-tax intent. Do not choose final concrete monsters. Instead, annotate where combat and special pressure should go.
 
+## Real Few-Shot Input
+
+When `few_shot_reference_floors` is present, it is the economy generator's construction set: one generator/reviewer shared anchor plus generator-only examples. Decode its actual `map_codes` through the project-local `tile_legend`, then use the candidate routes, route-graph edge contents, and `resource_reachability_order` as positive examples. Reproduce relationships such as staged access, competing key uses, stronger compensation behind stronger gates, and optional deep rewards. Do not copy source tile codes, totals, scripts, or unsupported mechanics. Reviewer holdouts are intentionally absent; do not guess or optimize for them.
+
 ## Hard Rules
 
 - Return only JSON matching the orchestrator schema.
@@ -25,14 +29,19 @@ Start from the topology stage output. Add the floor's economy: doors, keys, reso
 
 ## Economy Quality
 
+- Follow `tower_brief.tower_style` without changing the user's resource totals.
+- For `traditional`, use clear regions with multiple branch types, target 70%-90% protected important resources and 0%-10% key/resource safety margin, and place 0.5-2 tools per floor on average when the confirmed whole-tower budget permits.
+- For `red_sea`, distribute rewards across narrow local branches and protect nearly every valuable reward with a door, monster role, route commitment, supported special pressure, or existing tool relationship.
 - Add meaningful door/key pressure. Doors should buy shortcuts, reward access, route changes, or safer combat profiles.
 - Do not spend budget just because it is available.
-- Keep the entrance free region controlled: at most a tiny starter reward and no naked tool.
+- Keep the entrance free region controlled: no naked tool or unprotected important-resource cluster.
 - Avoid large low-cost connected resource blobs.
+- Disperse by real access cost: ≥1/4 of floor gems (min 2) in one region or ≥1/3 (min 3) across a one-door/one-wall link fails; a decorative guard is not dispersion.
 - Distribute keys and tools across route stages instead of bunching them near the entrance.
 - Blue doors and tool routes need better compensation than yellow-door baseline routes.
 - Tools such as pickaxe, bomb, and centerFly must be protected or must unlock a clear route/reward purpose.
 - Higher-cost or riskier route choices need stronger rewards or shorter access.
+- Balance every candidate route as a cost/reward tradeoff. Compare door/key cost, tool commitment, expected combat or special pressure, detour length, and reachable rewards; no route should be all cost, and no route should be simultaneously cheaper and richer than every alternative.
 - Respect resource progression from `current_floor_policy.resource_progression`.
 - You may add, remove, or move up to 3 wall tiles when needed to make a door, tool, reward pocket, or shortcut actually meaningful.
 - Do not treat broken walls as decoration. A pocket or gap should change access cost, protect value, create tool value, or create a later combat/special placement.
