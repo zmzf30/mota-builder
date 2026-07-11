@@ -850,7 +850,16 @@ def build_command(
     if form["resumeExisting"]:
         cmd.append("--resume-existing")
     else:
-        cmd.extend(["--clean", "--floors", str(floors), "--floor-size", str(floor_size)])
+        cmd.extend(
+            [
+                "--clean",
+                "--no-generation-cache",
+                "--floors",
+                str(floors),
+                "--floor-size",
+                str(floor_size),
+            ]
+        )
     if concurrency > 1 and not form["resumeExisting"]:
         cmd.extend(["--parallel-floors", "--floor-concurrency", str(concurrency)])
     return cmd
@@ -976,6 +985,22 @@ def run_belongs_to_ui_instance(status: dict[str, Any], instance_id: str) -> bool
         return stored_instance == instance_id
     _, separator, raw_port = instance_id.rpartition(":")
     return bool(separator and raw_port == str(DEFAULT_UI_PORT))
+
+
+def require_run_for_ui_instance(run_id: str, instance_id: str) -> Path:
+    """Resolve a run only when it belongs to the current UI server instance."""
+    run_dir = run_dir_for(run_id)
+    status_file = status_path(run_dir)
+    if not status_file.exists():
+        raise FileNotFoundError("run not found")
+    try:
+        status = read_json(status_file)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FileNotFoundError("run not found") from exc
+    if not run_belongs_to_ui_instance(status, instance_id):
+        # Do not reveal whether another port owns this run.
+        raise FileNotFoundError("run not found")
+    return run_dir
 
 
 def find_latest_resumable_run(instance_id: str) -> tuple[str, Path, dict[str, Any]]:
@@ -1610,8 +1635,8 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
             elif path == "/api/status":
                 query = parse_qs(parsed.query)
                 run_id = (query.get("run_id") or [""])[0]
-                run_dir = run_dir_for(run_id)
                 try:
+                    run_dir = require_run_for_ui_instance(run_id, self.current_ui_instance_id())
                     status = status_payload(run_id, run_dir, reconcile_process=True)
                 except FileNotFoundError:
                     self.send_json({"state": "missing", "message": "run not found"}, 404)
@@ -1725,6 +1750,7 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/stop":
                 payload = self.read_body_json()
                 run_id = str(payload.get("run_id") or "")
+                require_run_for_ui_instance(run_id, self.current_ui_instance_id())
                 stop_run(run_id)
                 self.send_json({"state": "stopped", "message": "已终止生成并删除本次产物。"})
             elif parsed.path == "/api/init":
@@ -1737,7 +1763,11 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
     def handle_export(self, query_string: str) -> None:
         query = parse_qs(query_string)
         run_id = (query.get("run_id") or [""])[0]
-        run_dir = run_dir_for(run_id)
+        try:
+            run_dir = require_run_for_ui_instance(run_id, self.current_ui_instance_id())
+        except FileNotFoundError:
+            self.send_json({"error": "run not found"}, 404)
+            return
         project_dir = project_dir_for(run_dir)
         if not project_dir.exists():
             self.send_json({"error": "project is not available yet"}, 404)
@@ -1762,7 +1792,11 @@ class MotaBuilderHandler(BaseHTTPRequestHandler):
         relative = parts[3] if len(parts) == 4 else "index.html"
         if relative in {"", "/"}:
             relative = "index.html"
-        run_dir = run_dir_for(run_id)
+        try:
+            run_dir = require_run_for_ui_instance(run_id, self.current_ui_instance_id())
+        except FileNotFoundError:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         if relative.startswith("project/"):
             target = safe_join(project_dir_for(run_dir), relative[len("project/") :])
         else:
