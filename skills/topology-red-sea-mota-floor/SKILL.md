@@ -1,13 +1,13 @@
 ---
-name: topology-mota-floor
-description: Generate only the structural topology for one classic mota-js floor inside the staged floor pipeline. Use after a tower brief and floor contract exist, before economy and encounter stages. Outputs a complete floor object plus structural annotations, but no doors, keys, resources, tools, monsters, nets, scripts, or events.
+name: topology-red-sea-mota-floor
+description: Generate only the fragmented, regionally balanced structural topology for one red-sea-style mota-js floor. Use as stage 1 when tower_style is red_sea, before economy and encounter placement. Output no doors, keys, resources, tools, monsters, nets, scripts, or events.
 ---
 
-# Topology Mota Floor
+# Topology Red Sea Mota Floor
 
 ## Role
 
-Act as stage 1 of a staged per-floor Magic Tower generator.
+Act as stage 1 of the red-sea per-floor generator.
 
 Generate the structural shell for exactly one mota-js floor. The output must already be a legal floor object with the requested id, size, stairs, empty required fields, and a map matrix. It is not the final playable floor; later stages will add economy and monsters.
 
@@ -33,21 +33,41 @@ When `few_shot_reference_floors` is present, it is the topology generator's cons
 
 ## Topology Quality
 
-- Follow `tower_brief.tower_style` and the supplied layout constraint.
-- For `traditional`, create 2-4 meaningful route families and around 6-20 effective decision opportunities. Favor clear regions, legible wall runs, and multiple kinds of branches.
-- For `red_sea`, create at least 3 meaningful route families and around 10-40 opportunities. Favor purposeful fragments, narrow routes, and frequent local commitments.
+- Require `tower_brief.tower_style=red_sea` and follow the supplied red-sea layout contract.
+- Create 4-5 meaningful route families and around 16-40 graph-real local opportunities.
 - Avoid a single obvious corridor.
 - Avoid uncontrolled open grids with too many equivalent loops.
 - Avoid thick filler walls, solid padding, pure decoration, and branches that cannot support later cost/reward choices.
-- Use the supplied style-specific wall-ratio target: normally 0.35-0.45 for traditional and 0.45-0.55 for red-sea, unless the user explicitly overrides it.
+- Treat wall ratio 0.40-0.52 as a soft target. Local density balance and downstream capacity are stronger requirements.
 - For smaller floors, keep the same idea with less absolute wall count: controlled branches and junctions matter more than decorative density.
 - Leave enough empty cells for the economy stage to add doors, keys, rewards, tools, and combat slots.
 - Put route junctions and candidate reward rooms where a later door, enemy, or special pressure could matter.
-- In traditional style, clean wall runs and clear regions are valid. In red-sea style, prefer broken-but-purposeful wall fragments over clean orthogonal maze bars or reused floor masks.
+- Prefer broken-but-purposeful short wall groups over clean orthogonal maze bars, thick blocks, or reused floor masks.
 - Use offset gaps, small pockets, T/corner wall joins, and short local loops only when they can support later economy.
 - A broken wall is valid only if it can change access cost, reward protection, tool value, or route choice.
 - Do not satisfy the style-specific opportunity target by annotation count alone. Every annotated junction, pocket, shortcut, reward room, door site, or special-pressure site must correspond to a real structural feature in the map graph.
 - Preserve downstream capacity. After stairs and walls, leave enough usable cells for the required non-orthogonally-adjacent enemies, several meaningful door sites, and staged resource placements. Do not create a visually dense topology that later stages can fill only with corridor clutter.
+
+## Regional Density
+
+- Treat the floor as nine spatial macro-zones as well as logical access regions.
+- Keep structural density present across the whole floor; do not put nearly all wall boundaries and branches on one side.
+- Keep the macro-zone topology density range at or below 0.40 before economy placement, with 0.32 as the final-floor target after objects are placed.
+- Do not leave two adjacent macro-zones simultaneously sparse.
+- Vary later region roles rather than prescribing the same resource recipe everywhere.
+
+## Fragmentation Contract
+
+Satisfy at least three of the supplied four fragmentation checks:
+
+- At least 18 wall components on a 13x13 floor.
+- At least 55% of wall cells belong to wall components of no more than five cells.
+- Wall/non-wall adjacency transition ratio is at least 0.43.
+- The longest uninterrupted interior wall run is no more than five cells.
+
+Exclude a deliberate outer border from the straight-run intuition, but do not use a border as filler. Build short route segments that turn, branch, and rejoin. Keep non-wall junction share near or above 0.42 without opening an uncontrolled grid.
+
+Every wall fragment must bound a route, create a door or guard site, protect a future reward, create tool value, shape special pressure, or form a meaningful short loop. Random wall confetti fails.
 
 ## Annotations
 

@@ -13,7 +13,7 @@ Convert the user's natural-language request into parameters for `scripts/build_m
 
 ## Boundary
 
-- Do not manually call `design-traditional-mota-tower`, `review-mota-enemy-table`, `topology-mota-floor`, `economy-mota-floor`, `monster-special-mota-floor`, or `review-mota-floor`.
+- Do not manually call `design-traditional-mota-tower`, `review-mota-enemy-table`, `topology-mota-floor`, `economy-mota-floor`, `encounter-mota-floor`, or `review-mota-floor`.
 - Do not design floor content in this entry skill.
 - Do not review floor content in this entry skill.
 - Do not directly edit source `mota-js` project files. The script writes generated output under `build/`.
@@ -73,7 +73,7 @@ Prefer defaults unless the user gives a reason to change them.
 - `--max-attempts`: Defaults to `4` for Codex and `6` for OpenCode. Raise the Codex default only for a harder design or if the user asks for more retries.
 - `--parallel-floors`: Use only when the user accepts the tradeoff. It is faster but each floor must fit a preassigned budget contract instead of reacting to the actual previous accepted floor.
 - `--floor-concurrency`: Defaults to 4 for `--parallel-floors`; lower it if the user wants fewer simultaneous Codex calls. The script rejects values above 4.
-- Before floor generation, enemy-data generation runs its own projected-hero, floor-pool, and reviewer loop. Per-floor generation is then staged: topology -> economy -> monster-special, followed by staged review and structured repair routing.
+- Before floor generation, enemy-data generation runs its own projected-hero, floor-pool, and reviewer loop. Per-floor generation is staged: topology -> economy -> encounter. Economy places no doors or enemies; encounter jointly places doors, monsters, and specials. One final floor review follows encounter generation and routes repair to the earliest owning stage.
 - Browser playtest runs after each accepted floor by default using `playtest-mota-game`. Use `--skip-playtest` only when browser automation is unavailable or the user explicitly wants faster non-browser generation.
 - `--playtest-policy`: Defaults to `warn`, so playtest findings are reported but do not block generation. Use `fail` only when the user explicitly wants browser playtest issues to fail the pipeline.
 - `--model`: Defaults to `gpt-5.5` for all internal Codex calls. Override only if the user requests a specific model.
@@ -84,7 +84,7 @@ Prefer defaults unless the user gives a reason to change them.
 - `--sandbox`: Keep `read-only` for planning. Use a broader sandbox only if later pipeline stages intentionally edit files.
 - `--floor-prefix` and `--floor-number-offset`: Set only if the user wants non-default floor IDs.
 - `--floor-size`: Set only when the user explicitly asks for 9x9 or 13x13, or explicitly confirms 11x11.
-- Traditional defaults are wall ratio `0.35-0.45`, 2-4 route families, 6-20 effective decisions, 18-28 enemies, 2-6 special-pressure positions, 0.5-2 tools per floor on average, 70%-90% protected important resources, and 0%-10% key/resource safety margin. Red-sea defaults are wall ratio `0.45-0.55`, 10-40 effective decisions, and 22-33 enemies unless explicitly overridden.
+- Traditional defaults are wall ratio `0.35-0.45`, 2-4 route families, 6-20 effective decisions, 18-28 enemies, 2-6 special-pressure positions, 0.5-2 tools per floor on average, 70%-90% protected important resources, and 0%-10% key/resource safety margin. Red-sea defaults are a soft wall-ratio target of `0.40-0.52`, 4-5 route families, 16-40 effective decisions, 24-32 enemies, balanced macro-region density, and purposeful wall/route fragmentation unless explicitly overridden.
 - Parallel floor contracts read exact per-floor tracked-resource budgets from `tower_brief.floor_progression_plan[].resource_budget`. Only if the plan is missing, malformed, or does not sum to the whole-tower limits may the orchestrator log the validation errors and fall back to integer distribution.
 - Before generation, always force `global_settings.initial_hero.tools.book=1` for every style.
 - `--few-shot-count`: Keep the default 3 unless prompt size must be reduced or the user requests a different number. The count applies separately to each generator and reviewer: normally one shared anchor plus two role-exclusive examples. The corpus fingerprint is part of all generation cache keys.

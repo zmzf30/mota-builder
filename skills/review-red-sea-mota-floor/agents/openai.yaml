@@ -1,0 +1,4 @@
+interface:
+  display_name: "审查红海魔塔楼层"
+  short_description: "Review one Red Sea mota floor"
+  default_prompt: "Use $review-red-sea-mota-floor to review one generated Red Sea floor against its style contract."

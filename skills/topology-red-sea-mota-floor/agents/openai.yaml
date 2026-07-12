@@ -1,0 +1,4 @@
+interface:
+  display_name: "红海魔塔拓扑生成"
+  short_description: "Generate one Red Sea topology-only floor"
+  default_prompt: "Use $topology-red-sea-mota-floor to generate a dense, fragmented Red Sea floor topology."

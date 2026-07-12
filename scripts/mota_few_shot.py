@@ -110,7 +110,7 @@ ANCHOR_BONUSES: dict[str, dict[tuple[str, str], float]] = {
         ("星月神话 2.10.3", "MT7"): 9,
         ("星月神话 2.10.3", "MT8"): 9,
     },
-    "monster": {
+    "encounter": {
         ("红蓝的记忆2.10", "MT1"): 12,
         ("红蓝的记忆2.10", "MT4"): 12,
         ("dist", "MT1"): 11,
@@ -122,7 +122,7 @@ ANCHOR_BONUSES["integration"] = {
     key: max(
         ANCHOR_BONUSES["topology"].get(key, 0),
         ANCHOR_BONUSES["economy"].get(key, 0),
-        ANCHOR_BONUSES["monster"].get(key, 0),
+        ANCHOR_BONUSES["encounter"].get(key, 0),
     )
     for key in set().union(*(value.keys() for value in ANCHOR_BONUSES.values()))
 }
@@ -135,10 +135,11 @@ REVIEWER_CONTRASTIVE_REJECTION_CASES: dict[str, list[str]] = {
     ],
     "economy": [
         "Reject evenly sprinkled per-floor quotas when resources do not have visibly different access stages.",
-        "Reject a stronger door, longer detour, or tool commitment that has no stronger compensation than the baseline route.",
+        "Reject stronger intended pressure, a longer detour, or tool commitment that has no stronger compensation than the baseline route.",
         "Reject naked high-value resource clusters or tools reachable in the free entrance region without a meaningful commitment.",
     ],
-    "monster": [
+    "encounter": [
+        "Reject doors that spend key quota without changing reward access, shortcut value, route choice, or combat profile.",
         "Reject enemies added only to reach the count when they do not tax a route, guard value, or create a threshold.",
         "Reject zone or repulse enemies whose coverage does not materially affect movement, access, or compensation.",
         "Reject a monster pool whose apparent roles collapse to nearly identical combat thresholds.",
@@ -1088,7 +1089,7 @@ def build_selection_plan(
         for item in style_floors
         if item.get("reference_id")
     }
-    for stage in ("topology", "economy", "monster", "integration"):
+    for stage in ("topology", "economy", "encounter", "integration"):
         stage_plan: dict[str, dict[str, list[str]]] = {}
         for floor_index in range(floor_count):
             target_position = floor_index / max(floor_count - 1, 1)
@@ -1103,13 +1104,13 @@ def build_selection_plan(
             )
         plan["stages"][stage] = stage_plan
 
-    # Monster placement is a layout stage and uses the curated floors above,
+    # Encounter placement is a layout stage and uses the curated floors above,
     # but enemy-table design must retain its prior, full-style calibration.
     enemy_stage_plan = {
         str(floor_index): _consumer_selection_for_floor(
             style_floors,
             project_by_id,
-            "monster",
+            "encounter",
             floor_index / max(floor_count - 1, 1),
             floor_size,
             count,
@@ -1268,7 +1269,7 @@ def _prompt_projection(example: dict[str, Any], stage: str) -> dict[str, Any]:
         },
         "resource_reachability_order": resource_order,
     }
-    if stage in {"monster", "integration", "enemy_design"}:
+    if stage in {"encounter", "integration", "enemy_design"}:
         projection["used_enemy_stats_from_enemys_js"] = example.get("used_enemy_stats", {})
     return _normalize_traditional_layout_projection(projection, example, stage)
 

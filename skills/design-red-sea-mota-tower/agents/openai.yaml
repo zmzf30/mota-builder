@@ -1,0 +1,4 @@
+interface:
+  display_name: "红海魔塔设计"
+  short_description: "Confirm a Red Sea mota tower brief"
+  default_prompt: "Use $design-red-sea-mota-tower to confirm the whole-tower Red Sea brief before floor generation."

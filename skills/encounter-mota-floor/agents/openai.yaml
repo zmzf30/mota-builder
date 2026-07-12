@@ -1,0 +1,4 @@
+interface:
+  display_name: "魔塔遭遇设计"
+  short_description: "Jointly place doors, monsters, and special pressure"
+  default_prompt: "Use $encounter-mota-floor to finalize doors, monsters, and special pressure without moving economy content."

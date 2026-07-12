@@ -73,6 +73,7 @@ TRACKED_RESOURCES = [
     "yellowPotions",
     "greenPotions",
 ]
+DOOR_RESOURCE_KEYS = {"yellow_doors", "blue_doors", "red_doors"}
 
 SUPPORTED_FLOOR_SIZES = {9, 11, 13}
 DEFAULT_FLOOR_SIZE = 11
@@ -86,8 +87,26 @@ AGENT_BACKENDS = ("codex", "opencode")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
-CACHE_VERSION = "token-cache-v10-resource-dispersion"
-PROMPT_PAYLOAD_VERSION = "compact-prompts-v12-token-compact-json"
+CACHE_VERSION = "token-cache-v15-encounter-stage"
+PROMPT_PAYLOAD_VERSION = "compact-prompts-v13-encounter-stage"
+RED_SEA_PROMPT_BUNDLE_VERSION = "red-sea-prompts-v1"
+
+STYLE_SKILL_NAMES = {
+    "traditional": {
+        "brief": "design-traditional-mota-tower",
+        "topology": "topology-mota-floor",
+        "economy": "economy-mota-floor",
+        "encounter": "encounter-mota-floor",
+        "review": "review-mota-floor",
+    },
+    "red_sea": {
+        "brief": "design-red-sea-mota-tower",
+        "topology": "topology-red-sea-mota-floor",
+        "economy": "economy-red-sea-mota-floor",
+        "encounter": "encounter-red-sea-mota-floor",
+        "review": "review-red-sea-mota-floor",
+    },
+}
 
 RESOURCE_WEIGHT_BY_ID = {
     "redGem": 1.0,
@@ -151,17 +170,36 @@ STYLE_LAYOUT_PROFILES: dict[str, dict[str, Any]] = {
         ),
     },
     "red_sea": {
-        "wall_ratio_min": 0.45,
-        "wall_ratio_max": 0.55,
-        "route_family_min": 3,
+        "wall_ratio_min": 0.40,
+        "wall_ratio_max": 0.52,
+        "route_family_min": 4,
         "route_family_max": 5,
-        "opportunity_min": 10,
+        "opportunity_min": 16,
         "opportunity_max": 40,
-        "enemy_count_min": 22,
-        "enemy_count_max": 33,
+        "enemy_count_min": 24,
+        "enemy_count_max": 32,
+        "occupied_non_wall_ratio_min": 0.65,
+        "occupied_non_wall_ratio_max": 0.80,
+        "spatial_density_range_target": 0.25,
+        "spatial_density_range_max": 0.32,
+        "topology_spatial_density_range_max": 0.40,
+        "empty_ground_min": 18,
+        "wall_fragmentation_min_score": 3,
+        "wall_component_min": 18,
+        "small_wall_share_min": 0.55,
+        "wall_transition_ratio_min": 0.43,
+        "max_interior_wall_run": 5,
+        "junction_share_min": 0.42,
+        "protected_resource_ratio_min": 0.9,
+        "protected_resource_ratio_max": 1.0,
+        "item_structure": (
+            "Keep macro-region density close while varying each region's mix of combat, doors, "
+            "tools, and protected rewards. Disperse each major resource type across access regions."
+        ),
         "description": (
-            "Use purposeful fragmented walls, narrow routes, frequent local branches, and widely "
-            "distributed protected rewards. Use only currently supported tiles and mechanics."
+            "Use purposefully fragmented short wall groups, narrow route segments, frequent local "
+            "branches and rejoins, balanced macro-region density, and widely distributed protected "
+            "rewards. Use only currently supported tiles and mechanics."
         ),
     },
 }
@@ -172,6 +210,7 @@ DEFAULT_ENEMY_DESIGN_COUNT = 0
 HIGH_VALUE_POCKET_THRESHOLD = 3.0
 DEFAULT_HIGH_VALUE_POCKET_THRESHOLD = HIGH_VALUE_POCKET_THRESHOLD
 PRESSURE_ANNOTATION_KINDS = {
+    "pressure_intent",
     "combat_chokepoint",
     "reward_guard",
     "route_tax",
@@ -181,7 +220,7 @@ PRESSURE_ANNOTATION_KINDS = {
 STAGE_LABELS = {
     "topology": "地图结构",
     "economy": "资源和路线",
-    "monster": "怪物和战斗",
+    "encounter": "门和战斗遭遇",
     "integration": "整体",
 }
 
@@ -207,8 +246,8 @@ def beginner_review_reason(summary: str) -> str:
         add("地图结构还不合适")
     if "local economy review failed" in lower:
         add("资源、钥匙门或路线取舍还不合适")
-    if "local monster review failed" in lower:
-        add("怪物和战斗压力还不合适")
+    if "local encounter review failed" in lower:
+        add("门和战斗遭遇还不合适")
     if "local integration review failed" in lower:
         add("整层地图还没有达到可保存标准")
     if "entrance" in lower and "exit" in lower and "reachable" in lower:
@@ -522,7 +561,7 @@ COORD_SCHEMA = {
 }
 ANNOTATION_SCHEMA = strict_schema_object(
     {
-        "stage": {"type": "string", "enum": ["topology", "economy", "monster", "integration", "unknown"]},
+        "stage": {"type": "string", "enum": ["topology", "economy", "encounter", "integration", "unknown"]},
         "kind": {"type": "string"},
         "label": {"type": "string"},
         "coordinates": schema_array(COORD_SCHEMA),
@@ -539,10 +578,10 @@ STRUCTURED_ISSUE_SCHEMA = strict_schema_object(
     {
         "owner_stage": {
             "type": "string",
-            "enum": ["topology", "economy", "monster", "integration"],
+            "enum": ["topology", "economy", "encounter", "integration"],
         },
         "severity": {"type": "string", "enum": ["fail", "warn"]},
-        "repair_stage": {"type": "string", "enum": ["topology", "economy", "monster"]},
+        "repair_stage": {"type": "string", "enum": ["topology", "economy", "encounter"]},
         "coordinates": schema_array(COORD_SCHEMA),
         "reason": {"type": "string"},
         "required_change": {"type": "string"},
@@ -557,6 +596,16 @@ STRUCTURED_REVIEW_SCHEMA: dict[str, Any] = {
         "issues": schema_array(STRUCTURED_ISSUE_SCHEMA),
         "required_changes": STRING_ARRAY_SCHEMA,
         "budget_delta": RESOURCE_DELTA_SCHEMA,
+        "summary": {"type": "string"},
+    },
+}
+
+FINAL_CANDIDATE_SELECTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["selected_candidate_id", "summary"],
+    "properties": {
+        "selected_candidate_id": {"type": "string"},
         "summary": {"type": "string"},
     },
 }
@@ -594,7 +643,7 @@ ENEMY_DESIGN_SCHEMA: dict[str, Any] = {
 
 ENEMY_TABLE_REVIEW_ISSUE_SCHEMA = strict_schema_object(
     {
-        "severity": {"type": "string", "enum": ["fail", "warn"]},
+        "severity": {"type": "string", "enum": ["fail"]},
         "floor_indices": schema_array({"type": "integer"}),
         "enemy_ids": STRING_ARRAY_SCHEMA,
         "reason": {"type": "string"},
@@ -612,7 +661,7 @@ ENEMY_TABLE_REVIEW_SCHEMA: dict[str, Any] = {
     },
 }
 
-STAGED_PIPELINE_STAGES = ["topology", "economy", "monster"]
+STAGED_PIPELINE_STAGES = ["topology", "economy", "encounter"]
 STAGE_ORDER = {stage: index for index, stage in enumerate(STAGED_PIPELINE_STAGES)}
 
 
@@ -722,7 +771,7 @@ def ensure_floor_progression_plan(
     for floor_index in range(floor_count):
         role = "entrance" if floor_index == 0 else "final" if floor_index == floor_count - 1 else "middle"
         references: list[str] = []
-        for stage in ("topology", "economy", "monster"):
+        for stage in ("topology", "economy", "encounter"):
             selection = stage_selections.get(stage, {}).get(str(floor_index), [])
             stage_references = (
                 selection.get("generator", []) if isinstance(selection, dict) else selection
@@ -883,7 +932,7 @@ def structured_issue(
     coordinates: list[list[int]] | None = None,
     repair_stage: str | None = None,
 ) -> dict[str, Any]:
-    if owner_stage not in {"topology", "economy", "monster", "integration"}:
+    if owner_stage not in {"topology", "economy", "encounter", "integration"}:
         owner_stage = "integration"
     if severity not in {"fail", "warn"}:
         severity = "fail"
@@ -891,9 +940,9 @@ def structured_issue(
         if owner_stage in STAGE_ORDER:
             repair_stage = owner_stage
         else:
-            repair_stage = classify_issue_owner(reason + " " + str(required_change or ""), "monster")
+            repair_stage = classify_issue_owner(reason + " " + str(required_change or ""), "encounter")
             if repair_stage not in STAGE_ORDER:
-                repair_stage = "monster"
+                repair_stage = "encounter"
     return {
         "owner_stage": owner_stage,
         "severity": severity,
@@ -912,21 +961,22 @@ def classify_issue_owner(text: str, default: str = "integration") -> str:
         "ground", "exit", "entrance", "thick", "decorative",
     ]
     economy_words = [
-        "economy", "door", "key", "resource", "tool", "budget", "quota", "gem",
+        "economy", "key", "resource", "tool", "budget", "quota", "gem",
         "potion", "pickaxe", "bomb", "centerfly", "free region", "cluster",
-        "reward", "blue-door", "yellow-door", "red-door",
+        "reward",
     ]
-    monster_words = [
-        "monster", "enemy", "combat", "special", "zone", "repulse", "领域", "阻击",
+    encounter_words = [
+        "encounter", "door", "blue-door", "yellow-door", "red-door", "enemy",
+        "combat", "special", "zone", "repulse", "领域", "阻击",
         "adjacent", "battle", "chokepoint", "damage",
     ]
     if any(word in lowered for word in economy_words):
         return "economy"
-    if any(word in lowered for word in monster_words):
-        return "monster"
+    if any(word in lowered for word in encounter_words):
+        return "encounter"
     if any(word in lowered for word in topology_words):
         return "topology"
-    return default if default in {"topology", "economy", "monster", "integration"} else "integration"
+    return default if default in {"topology", "economy", "encounter", "integration"} else "integration"
 
 
 def normalize_structured_issues(review: dict[str, Any], default_owner_stage: str) -> list[dict[str, Any]]:
@@ -1012,7 +1062,7 @@ def earliest_repair_stage(review: dict[str, Any], default_owner_stage: str = "in
     issues = normalize_structured_issues(review, default_owner_stage)
     fail_issues = [issue for issue in issues if issue.get("severity") == "fail"]
     if not fail_issues:
-        return "monster"
+        return "encounter"
     stages = [repair_stage_for_issue(issue) for issue in fail_issues]
     return min(stages, key=lambda stage: STAGE_ORDER[stage])
 
@@ -1052,6 +1102,26 @@ def distribute_limit(limit: int | None, floor_count: int, floor_index: int) -> i
         return None
     base, remainder = divmod(limit, floor_count)
     return base + (1 if floor_index < remainder else 0)
+
+
+def distribute_red_sea_limit(
+    key: str,
+    limit: int | None,
+    floor_count: int,
+    floor_index: int,
+) -> int | None:
+    if limit is None:
+        return None
+    if key in {"redGems", "blueGems", "redPotions"} and limit == floor_count * 7:
+        if floor_count <= 2:
+            values = [7] * floor_count
+        else:
+            low_count = max(1, floor_count // 3)
+            high_count = low_count
+            values = [6] * low_count + [7] * (floor_count - low_count - high_count) + [8] * high_count
+        return values[floor_index]
+    base, remainder = divmod(limit, floor_count)
+    return base + (1 if floor_index >= floor_count - remainder and remainder else 0)
 
 
 def floor_budgets_from_brief(
@@ -1153,7 +1223,11 @@ def build_floor_contracts(
             planned_budgets[floor_index]
             if planned_budgets is not None
             else {
-                key: distribute_limit(limits.get(key), floor_count, floor_index)
+                key: (
+                    distribute_limit(limits.get(key), floor_count, floor_index)
+                    if tower_style(brief) == "traditional"
+                    else distribute_red_sea_limit(key, limits.get(key), floor_count, floor_index)
+                )
                 for key in TRACKED_RESOURCES
             }
         )
@@ -1430,7 +1504,7 @@ def compact_previous_floor_summaries(previous: list[dict[str, Any]]) -> list[dic
             "summary": str(item.get("summary", ""))[:500],
             "budget_delta": normalize_delta(item.get("budget_delta")),
         }
-        for key in ("forced_accept", "parallel", "resumed"):
+        for key in ("forced_accept", "best_effort_selection", "parallel", "resumed"):
             if key in item:
                 summary[key] = item[key]
         if isinstance(item.get("floor_contract"), dict):
@@ -1463,17 +1537,18 @@ def upstream_stage_map_context(output: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def brief_cache_key(args: argparse.Namespace, idea: str) -> str:
-    return stable_hash(
-        {
-            "kind": "brief",
-            "cache_version": CACHE_VERSION,
-            "prompt_payload_version": PROMPT_PAYLOAD_VERSION,
-            "agent": cache_seed_args(args),
-            "idea": idea,
-            "floors": getattr(args, "floors", None),
-            "floor_size": getattr(args, "floor_size", None),
-        }
-    )
+    payload = {
+        "kind": "brief",
+        "cache_version": CACHE_VERSION,
+        "prompt_payload_version": PROMPT_PAYLOAD_VERSION,
+        "agent": cache_seed_args(args),
+        "idea": idea,
+        "floors": getattr(args, "floors", None),
+        "floor_size": getattr(args, "floor_size", None),
+    }
+    if normalize_tower_style(getattr(args, "tower_style", None)) == "red_sea":
+        payload["red_sea_prompt_bundle"] = red_sea_prompt_bundle_fingerprint(args.repo_root)
+    return stable_hash(payload)
 
 
 def project_tables_hash(maps: dict[str, Any], enemys: dict[str, Any]) -> str:
@@ -1543,6 +1618,8 @@ def floor_generation_cache_key(
         payload["traditional_layout_selection_version"] = (
             getattr(args, "few_shot_plan", None) or {}
         ).get("version")
+    else:
+        payload["red_sea_prompt_bundle"] = red_sea_prompt_bundle_fingerprint(args.repo_root)
     return stable_hash(payload)
 
 
@@ -1902,10 +1979,151 @@ TOPOLOGY_OPPORTUNITY_KINDS = {
 }
 
 
+def spatial_density_and_fragmentation_metrics(
+    floor_output: dict[str, Any],
+    maps: dict[str, Any],
+) -> dict[str, Any]:
+    floor = floor_output.get("floor", {})
+    try:
+        width, height, matrix = floor_dimensions(floor)
+    except PipelineError:
+        return {"available": False}
+
+    x_cuts = [round(index * width / 3) for index in range(4)]
+    y_cuts = [round(index * height / 3) for index in range(4)]
+    zones: list[dict[str, Any]] = []
+    for zone_y in range(3):
+        for zone_x in range(3):
+            x0, x1 = x_cuts[zone_x], x_cuts[zone_x + 1]
+            y0, y1 = y_cuts[zone_y], y_cuts[zone_y + 1]
+            total = max((x1 - x0) * (y1 - y0), 1)
+            walls = 0
+            objects = 0
+            empty_ground = 0
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    code = matrix[y][x]
+                    if is_wall_entry(maps.get(str(code))):
+                        walls += 1
+                    elif code == 0:
+                        empty_ground += 1
+                    else:
+                        objects += 1
+            non_wall = total - walls
+            zones.append(
+                {
+                    "zone": [zone_x, zone_y],
+                    "bbox": [[x0, y0], [x1 - 1, y1 - 1]],
+                    "visual_density": round((walls + objects) / total, 3),
+                    "object_density_non_wall": round(objects / max(non_wall, 1), 3),
+                    "empty_ground": empty_ground,
+                    "wall_count": walls,
+                    "object_count": objects,
+                }
+            )
+
+    visual_densities = [float(zone["visual_density"]) for zone in zones]
+    object_densities = [float(zone["object_density_non_wall"]) for zone in zones]
+    wall_nodes = {
+        (x, y)
+        for y, row in enumerate(matrix)
+        for x, code in enumerate(row)
+        if is_wall_entry(maps.get(str(code)))
+    }
+    wall_components: list[set[tuple[int, int]]] = []
+    unseen = set(wall_nodes)
+    while unseen:
+        start = unseen.pop()
+        component = {start}
+        stack = [start]
+        while stack:
+            x, y = stack.pop()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nxt = (x + dx, y + dy)
+                if nxt in unseen:
+                    unseen.remove(nxt)
+                    component.add(nxt)
+                    stack.append(nxt)
+        wall_components.append(component)
+
+    small_wall_cells = sum(len(component) for component in wall_components if len(component) <= 5)
+    transitions = 0
+    edges = 0
+    for y in range(height):
+        for x in range(width):
+            current_wall = (x, y) in wall_nodes
+            if x + 1 < width:
+                edges += 1
+                transitions += int(current_wall != ((x + 1, y) in wall_nodes))
+            if y + 1 < height:
+                edges += 1
+                transitions += int(current_wall != ((x, y + 1) in wall_nodes))
+
+    max_interior_wall_run = 0
+    for y in range(1, max(height - 1, 1)):
+        run = 0
+        for x in range(1, max(width - 1, 1)):
+            run = run + 1 if (x, y) in wall_nodes else 0
+            max_interior_wall_run = max(max_interior_wall_run, run)
+    for x in range(1, max(width - 1, 1)):
+        run = 0
+        for y in range(1, max(height - 1, 1)):
+            run = run + 1 if (x, y) in wall_nodes else 0
+            max_interior_wall_run = max(max_interior_wall_run, run)
+
+    non_wall_nodes = {
+        (x, y)
+        for y, row in enumerate(matrix)
+        for x, code in enumerate(row)
+        if not is_wall_entry(maps.get(str(code)))
+    }
+    junction_count = 0
+    for x, y in non_wall_nodes:
+        degree = sum(
+            (x + dx, y + dy) in non_wall_nodes
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+        )
+        junction_count += int(degree >= 3)
+
+    object_count = sum(1 for row in matrix for code in row if code != 0 and not is_wall_entry(maps.get(str(code))))
+    empty_ground_count = sum(1 for row in matrix for code in row if code == 0)
+    component_count = len(wall_components)
+    red_sea_profile = STYLE_LAYOUT_PROFILES["red_sea"]
+    wall_component_target = max(
+        6,
+        round(int(red_sea_profile["wall_component_min"]) * width * height / 169),
+    )
+    small_wall_share = small_wall_cells / max(len(wall_nodes), 1)
+    wall_transition_ratio = transitions / max(edges, 1)
+    fragmentation_checks = {
+        "enough_wall_components": component_count >= wall_component_target,
+        "enough_small_wall_cells": small_wall_share >= float(red_sea_profile["small_wall_share_min"]),
+        "enough_wall_transitions": wall_transition_ratio >= float(red_sea_profile["wall_transition_ratio_min"]),
+        "short_interior_wall_runs": max_interior_wall_run <= int(red_sea_profile["max_interior_wall_run"]),
+    }
+    return {
+        "available": True,
+        "zones": zones,
+        "visual_density_range": round(max(visual_densities) - min(visual_densities), 3),
+        "object_density_non_wall_range": round(max(object_densities) - min(object_densities), 3),
+        "occupied_non_wall_ratio": round(object_count / max(len(non_wall_nodes), 1), 3),
+        "empty_ground_count": empty_ground_count,
+        "wall_component_count": component_count,
+        "wall_component_target": wall_component_target,
+        "small_wall_cell_share": round(small_wall_share, 3),
+        "wall_transition_ratio": round(wall_transition_ratio, 3),
+        "max_interior_wall_run": max_interior_wall_run,
+        "junction_share_non_wall": round(junction_count / max(len(non_wall_nodes), 1), 3),
+        "fragmentation_checks": fragmentation_checks,
+        "fragmentation_score": sum(fragmentation_checks.values()),
+    }
+
+
 def topology_capacity_metrics(
     floor_output: dict[str, Any],
     maps: dict[str, Any],
     brief: dict[str, Any] | None = None,
+    floor_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     floor = floor_output.get("floor", {})
     try:
@@ -2016,7 +2234,7 @@ def topology_capacity_metrics(
     min_enemies = monster_policy_int(brief or {}, "enemy_count_min_per_floor")
     reserved_door_sites = min(3, len(door_sites))
     residual_resource_cells = max(len(ground_nodes) - min_enemies - reserved_door_sites, 0)
-    return {
+    metrics = {
         "available": True,
         "map_size": [width, height],
         "ground_cells_excluding_stairs": len(ground_nodes),
@@ -2033,6 +2251,27 @@ def topology_capacity_metrics(
         "potential_door_site_count": len(door_sites),
         "residual_resource_cells_after_min_enemies_and_three_doors": residual_resource_cells,
     }
+    if tower_style(brief) == "red_sea":
+        contract_limits = (
+            floor_contract.get("resource_limits", {})
+            if isinstance(floor_contract, dict) and isinstance(floor_contract.get("resource_limits"), dict)
+            else {}
+        )
+        required_tracked_cells = sum(
+            max(int(contract_limits.get(key) or 0), 0)
+            for key in TRACKED_RESOURCES
+            if not isinstance(contract_limits.get(key), bool)
+        )
+        red_sea_empty_ground_min = int(STYLE_LAYOUT_PROFILES["red_sea"]["empty_ground_min"])
+        red_sea_required_cells = min_enemies + required_tracked_cells + red_sea_empty_ground_min
+        metrics.update(
+            {
+                "required_tracked_resource_cells": required_tracked_cells,
+                "red_sea_required_cells_including_empty_ground": red_sea_required_cells,
+                "red_sea_capacity_slack": len(ground_nodes) - red_sea_required_cells,
+            }
+        )
+    return metrics
 
 
 def topology_stage_review_issues(
@@ -2045,6 +2284,7 @@ def topology_stage_review_issues(
     wall_ratio_min: float = DEFAULT_WALL_RATIO_MIN,
     wall_ratio_max: float = DEFAULT_WALL_RATIO_MAX,
     brief: dict[str, Any] | None = None,
+    floor_contract: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     issues, matrix = stage_floor_shape_issues(floor_output, expected_floor_id, floor_size, maps, "topology")
     if matrix is None:
@@ -2108,7 +2348,7 @@ def topology_stage_review_issues(
         )
     for issue in wall_mask_similarity_issues(previous_floor_outputs or [], floor_output, maps, max_wall_similarity):
         issues.append(structured_issue("topology", "fail", issue))
-    capacity = topology_capacity_metrics(floor_output, maps, brief)
+    capacity = topology_capacity_metrics(floor_output, maps, brief, floor_contract)
     if capacity.get("available"):
         validated = int(capacity.get("validated_opportunity_count", 0))
         opportunity_min, opportunity_max = opportunity_range(brief)
@@ -2117,7 +2357,7 @@ def topology_stage_review_issues(
             issues.append(
                 structured_issue(
                     "topology",
-                    "warn",
+                    "fail" if selected_style == "red_sea" else "warn",
                     f"Only {validated} annotated opportunity coordinates are validated by real branch, pocket, junction, or shortcut structure; target is {opportunity_min}-{opportunity_max} for {selected_style} style.",
                     f"Move or replace decorative annotations so {opportunity_min}-{opportunity_max} coordinates correspond to real graph junctions, articulation points, or branch ends.",
                     capacity.get("invalid_or_decorative_annotation_coords", []),
@@ -2140,7 +2380,7 @@ def topology_stage_review_issues(
                     "topology",
                     "fail",
                     f"Topology downstream capacity supports only {enemy_capacity} guaranteed non-orthogonally-adjacent enemy cells, below the required {required_capacity}.",
-                    "Open or reshape usable route cells while preserving meaningful branches so the monster stage can meet its minimum without filler adjacency.",
+                    "Open or reshape usable route cells while preserving meaningful branches so the encounter stage can meet its enemy minimum without filler adjacency.",
                 )
             )
         if int(capacity.get("potential_door_site_count", 0)) < 3:
@@ -2161,6 +2401,58 @@ def topology_stage_review_issues(
                     "Increase usable branch and pocket capacity without turning the floor into an uncontrolled open grid.",
                 )
             )
+    if tower_style(brief) == "red_sea":
+        red_sea_metrics = spatial_density_and_fragmentation_metrics(floor_output, maps)
+        profile = STYLE_LAYOUT_PROFILES["red_sea"]
+        if red_sea_metrics.get("available"):
+            fragmentation_score = int(red_sea_metrics.get("fragmentation_score", 0))
+            if fragmentation_score < int(profile["wall_fragmentation_min_score"]):
+                issues.append(
+                    structured_issue(
+                        "topology",
+                        "fail",
+                        (
+                            f"Red-sea wall fragmentation satisfies only {fragmentation_score}/4 checks; "
+                            f"details: {red_sea_metrics.get('fragmentation_checks', {})}."
+                        ),
+                        "Break long or bulky wall masses into purposeful short groups, offset gaps, wall islands, and short separators while preserving route function.",
+                    )
+                )
+            density_range = float(red_sea_metrics.get("visual_density_range", 0.0))
+            topology_density_max = float(profile["topology_spatial_density_range_max"])
+            if density_range > topology_density_max:
+                issues.append(
+                    structured_issue(
+                        "topology",
+                        "fail",
+                        f"Red-sea topology macro-zone wall/stair density range is {density_range:.2f}, above {topology_density_max:.2f}; one part of the floor is structurally much emptier than another.",
+                        "Redistribute purposeful wall fragments and route boundaries across the 3x3 macro-zones; do not fix this by adding one solid wall block.",
+                    )
+                )
+            junction_share = float(red_sea_metrics.get("junction_share_non_wall", 0.0))
+            if junction_share < float(profile["junction_share_min"]):
+                issues.append(
+                    structured_issue(
+                        "topology",
+                        "fail",
+                        f"Red-sea non-wall junction share is {junction_share:.2f}, below {float(profile['junction_share_min']):.2f}.",
+                        "Replace long clean corridors with short route segments, local branches, and purposeful rejoins without creating an uncontrolled open grid.",
+                    )
+                )
+        if capacity.get("available"):
+            capacity_slack = int(capacity.get("red_sea_capacity_slack", 0))
+            if capacity_slack < 0:
+                issues.append(
+                    structured_issue(
+                        "topology",
+                        "fail",
+                        (
+                            "Red-sea topology cannot fit this floor's exact tracked-resource quota, "
+                            f"minimum enemies, and required empty ground; capacity is short by {-capacity_slack} cells."
+                        ),
+                        "Open enough usable cells or reduce nonfunctional wall mass while retaining fragmented route boundaries.",
+                    )
+                )
     return issues
 
 
@@ -2240,7 +2532,7 @@ def economy_stage_review_issues(
         return issues, delta
 
     enemy_tiles: list[str] = []
-    doors = keys = 0
+    door_tiles: list[str] = []
     for y, row in enumerate(matrix):
         for x, code in enumerate(row):
             entry = maps.get(str(code), {})
@@ -2248,26 +2540,24 @@ def economy_stage_review_issues(
             if is_enemy_entry(entry):
                 enemy_tiles.append(f"{entry_id}@[{x},{y}]")
             if is_door_entry(entry):
-                doors += 1
-            if entry_id in {"yellowKey", "blueKey", "redKey"}:
-                keys += 1
+                door_tiles.append(f"{entry_id}@[{x},{y}]")
     if enemy_tiles:
         issues.append(
             structured_issue(
                 "economy",
                 "fail",
                 "economy stage must not place final enemy tiles: " + ", ".join(enemy_tiles[:12]),
-                "Replace enemy tiles with combat role annotations for monster-special stage.",
+                "Replace enemy tiles with pressure_intent annotations for the encounter stage.",
             )
         )
 
-    if doors < 1 or keys < 1:
+    if door_tiles:
         issues.append(
             structured_issue(
                 "economy",
                 "fail",
-                "economy stage should establish key/door pressure with at least one door and one key.",
-                "Place a meaningful door/key pair that creates route pressure or reward access.",
+                "economy stage must not place doors: " + ", ".join(door_tiles[:12]),
+                "Replace door tiles with ground and describe the required protection using pressure_intent annotations.",
             )
         )
 
@@ -2276,8 +2566,8 @@ def economy_stage_review_issues(
             structured_issue(
                 "economy",
                 "fail",
-                "economy stage must output combat or special pressure annotations for monster placement.",
-                "Add combat_chokepoint, reward_guard, route_tax, special_candidate, or mini_boss_candidate annotations.",
+                "economy stage must describe downstream route pressure without placing doors or enemies.",
+                "Add pressure_intent, combat_chokepoint, reward_guard, route_tax, special_candidate, or mini_boss_candidate annotations.",
             )
         )
 
@@ -2293,6 +2583,8 @@ def economy_stage_review_issues(
     if floor_contract:
         contract_limits = floor_limits_from_contract(floor_contract)
         for key, limit in contract_limits.items():
+            if key in DOOR_RESOURCE_KEYS:
+                continue
             if limit is not None and delta.get(key, 0) != limit:
                 issues.append(
                     structured_issue(
@@ -2304,7 +2596,9 @@ def economy_stage_review_issues(
                 )
 
     metrics = floor_static_metrics(floor_output, maps, {}, brief)
-    for issue in static_metric_issues(metrics):
+    # Doors and enemies are intentionally absent here, so final free-region metrics are not meaningful yet.
+    # Pocket protection remains checkable because pressure annotations are part of the economy contract.
+    for issue in high_value_pocket_metric_issues(metrics):
         issues.append(structured_issue("economy", "fail", issue))
     if enforce_resource_progression:
         for issue in floor_resource_progression_issues(brief, previous_floor_outputs, floor_output, maps):
@@ -2312,33 +2606,58 @@ def economy_stage_review_issues(
     return issues, delta
 
 
-def monster_stage_review_issues(
-    floor_output: dict[str, Any],
-    expected_floor_id: str,
-    floor_size: int,
-    brief: dict[str, Any],
+def encounter_preservation_issues(
+    economy_output: dict[str, Any] | None,
+    encounter_output: dict[str, Any],
     maps: dict[str, Any],
-    enemys: dict[str, Any],
-    limits: dict[str, int | None],
-    used: dict[str, int],
-    previous_floor_outputs: list[dict[str, Any]],
-    floor_policy: dict[str, Any] | None,
-    enforce_resource_progression: bool,
-    max_wall_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
-) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, Any]]:
-    local_issues, delta = local_floor_review(
-        floor_output, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
-    )
-    metrics = floor_static_metrics(floor_output, maps, enemys, brief)
-    local_issues.extend(static_metric_issues(metrics))
-    local_issues.extend(wall_mask_similarity_issues(previous_floor_outputs, floor_output, maps, max_wall_similarity))
-    if enforce_resource_progression:
-        local_issues.extend(floor_resource_progression_issues(brief, previous_floor_outputs, floor_output, maps))
-    local_issues.extend(budget_issues(delta, limits, used))
+) -> list[dict[str, Any]]:
+    if not isinstance(economy_output, dict):
+        return [
+            structured_issue(
+                "encounter",
+                "fail",
+                "final review requires the complete economy-stage baseline.",
+                "Regenerate the encounter from the reviewed economy output.",
+            )
+        ]
+    try:
+        before_width, before_height, before = floor_dimensions(economy_output.get("floor", {}))
+        after_width, after_height, after = floor_dimensions(encounter_output.get("floor", {}))
+    except PipelineError as exc:
+        return [structured_issue("encounter", "fail", str(exc))]
+    if (before_width, before_height) != (after_width, after_height):
+        return [
+            structured_issue(
+                "encounter",
+                "fail",
+                "encounter dimensions differ from the economy baseline.",
+                "Preserve the economy map dimensions exactly.",
+            )
+        ]
+
+    illegal_changes: list[list[int]] = []
+    for y in range(before_height):
+        for x in range(before_width):
+            before_code = before[y][x]
+            after_code = after[y][x]
+            if before_code == after_code:
+                continue
+            after_entry = maps.get(str(after_code), {})
+            if before_code == 0 and (is_door_entry(after_entry) or is_enemy_entry(after_entry)):
+                continue
+            illegal_changes.append([x, y])
+    if not illegal_changes:
+        return []
     return [
-        structured_issue(classify_issue_owner(issue, "monster"), "fail", issue)
-        for issue in local_issues
-    ], delta, metrics
+        structured_issue(
+            "encounter",
+            "fail",
+            "encounter changed walls, stairs, keys, resources, tools, or introduced a non-encounter tile.",
+            "Restore every economy tile exactly; only replace empty ground with a legal door or enemy.",
+            illegal_changes[:20],
+            repair_stage="encounter",
+        )
+    ]
 
 
 def integration_stage_review_issues(
@@ -2352,6 +2671,8 @@ def integration_stage_review_issues(
     used: dict[str, int],
     previous_floor_outputs: list[dict[str, Any]],
     floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+    economy_output: dict[str, Any] | None,
     enforce_resource_progression: bool,
     max_wall_similarity: float = MAX_ADJACENT_WALL_MASK_SIMILARITY,
 ) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, Any]]:
@@ -2364,10 +2685,26 @@ def integration_stage_review_issues(
     if enforce_resource_progression:
         local_issues.extend(floor_resource_progression_issues(brief, previous_floor_outputs, floor_output, maps))
     local_issues.extend(budget_issues(delta, limits, used))
-    return [
+    issues = [
         structured_issue(classify_issue_owner(issue, "integration"), "fail", issue)
         for issue in local_issues
-    ], delta, metrics
+    ]
+    issues.extend(encounter_preservation_issues(economy_output, floor_output, maps))
+    if floor_contract:
+        for key, limit in floor_limits_from_contract(floor_contract).items():
+            if limit is None or delta.get(key, 0) == limit:
+                continue
+            owner = "encounter" if key in DOOR_RESOURCE_KEYS else "economy"
+            issues.append(
+                structured_issue(
+                    owner,
+                    "fail",
+                    f"{key} exact floor quota mismatch: actual {delta.get(key, 0)} != required {limit}.",
+                    f"Adjust {key} placements to exactly {limit} on this floor.",
+                    repair_stage=owner,
+                )
+            )
+    return issues, delta, metrics
 
 
 def item_weight(entry_id: str | None) -> float:
@@ -2515,6 +2852,31 @@ def _brief_limit_count(brief: dict[str, Any], key: str) -> float:
     return 0.0
 
 
+def projected_resource_count_before_floor(
+    brief: dict[str, Any],
+    resource_key: str,
+    total: float,
+    floor_index: int,
+    floor_count: int,
+) -> float:
+    progression = brief.get("floor_progression_plan", [])
+    expected_count = max(floor_index, 0)
+    if isinstance(progression, list) and len(progression) >= expected_count:
+        planned_values: list[float] = []
+        for index in range(expected_count):
+            item = progression[index]
+            budget = item.get("resource_budget", {}) if isinstance(item, dict) else {}
+            value = budget.get(resource_key) if isinstance(budget, dict) else None
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                planned_values.append(float(value))
+            else:
+                planned_values = []
+                break
+        if len(planned_values) == expected_count:
+            return sum(planned_values)
+    return total * floor_index / max(floor_count, 1)
+
+
 def project_hero_bands_by_floor(brief: dict[str, Any], floor_count: int) -> list[dict[str, Any]]:
     """Project conservative/target/completion hero bands from whole-tower resources."""
     initial = brief.get("global_settings", {}).get("initial_hero", {})
@@ -2536,27 +2898,55 @@ def project_hero_bands_by_floor(brief: dict[str, Any], floor_count: int) -> list
         "yellowPotion": _brief_limit_count(brief, "yellowPotions"),
         "greenPotion": _brief_limit_count(brief, "greenPotions"),
     }
-    scenario_pickup = {"conservative": 0.55, "target": 0.80, "completion": 1.0}
+    selected_style = tower_style(brief)
+    scenario_pickup = (
+        {"conservative": 0.75, "target": 1.0, "completion": 1.0}
+        if selected_style == "red_sea"
+        else {"conservative": 0.55, "target": 0.80, "completion": 1.0}
+    )
+    resource_keys = {
+        "redGem": "redGems",
+        "blueGem": "blueGems",
+        "greenGem": "greenGems",
+        "yellowGem": "yellowGems",
+        "redPotion": "redPotions",
+        "bluePotion": "bluePotions",
+        "yellowPotion": "yellowPotions",
+        "greenPotion": "greenPotions",
+    }
     progression = brief.get("floor_progression_plan", [])
     projection: list[dict[str, Any]] = []
     for floor_index in range(max(floor_count, 0)):
         prior_floor_fraction = floor_index / max(floor_count, 1)
         bands: dict[str, dict[str, float]] = {}
         for scenario, pickup_ratio in scenario_pickup.items():
-            share = prior_floor_fraction * pickup_ratio
+            projected_counts = {
+                item_id: (
+                    projected_resource_count_before_floor(
+                        brief,
+                        resource_key,
+                        totals[item_id],
+                        floor_index,
+                        floor_count,
+                    )
+                    if selected_style == "red_sea"
+                    else totals[item_id] * prior_floor_fraction
+                )
+                * pickup_ratio
+                for item_id, resource_key in resource_keys.items()
+            }
             hero = dict(base)
-            hero["atk"] += totals["redGem"] * share * gem_gain_value(brief, "redGem")
-            hero["def"] += totals["blueGem"] * share * gem_gain_value(brief, "blueGem")
-            hero["mdef"] += totals["greenGem"] * share * gem_gain_value(brief, "greenGem")
-            yellow_count = totals["yellowGem"] * share
+            hero["atk"] += projected_counts["redGem"] * gem_gain_value(brief, "redGem")
+            hero["def"] += projected_counts["blueGem"] * gem_gain_value(brief, "blueGem")
+            hero["mdef"] += projected_counts["greenGem"] * gem_gain_value(brief, "greenGem")
+            yellow_count = projected_counts["yellowGem"]
             hero["hp"] += yellow_count * 1000.0
             hero["atk"] += yellow_count * 6.0
             hero["def"] += yellow_count * 6.0
             hero["mdef"] += yellow_count * 10.0
             for potion_id in POTION_ITEM_IDS:
                 hero["hp"] += (
-                    totals[potion_id]
-                    * share
+                    projected_counts[potion_id]
                     * potion_red_equiv_value(brief, potion_id)
                     * red_potion_value(brief)
                 )
@@ -2577,7 +2967,11 @@ def project_hero_bands_by_floor(brief: dict[str, Any], floor_count: int) -> list
                 "conservative": bands["conservative"],
                 "target": bands["target"],
                 "completion": bands["completion"],
-                "method": "Even whole-tower resource distribution with 55%/80%/100% pickup bands before this floor; no battle loss is subtracted.",
+                "method": (
+                    "Confirmed per-floor resource budgets with 75%/100%/100% pickup bands before this red-sea floor; no battle loss is subtracted."
+                    if selected_style == "red_sea"
+                    else "Even whole-tower resource distribution with 55%/80%/100% pickup bands before this floor; no battle loss is subtracted."
+                ),
             }
         )
     return projection
@@ -2716,6 +3110,7 @@ def build_floor_enemy_policies(
         monster_policy = {}
     max_types = max(int(monster_policy.get("monster_types_per_floor") or 9), 1)
     min_policy_types = min(max_types, 4)
+    selected_style = tower_style(brief)
     overlap_ratio = min(max(monster_policy_number(brief, "floor_overlap_ratio"), 0.0), 1.0)
     red_potion = red_potion_value(brief)
     rank_by_id = {item["id"]: index for index, item in enumerate(candidates)}
@@ -2741,13 +3136,24 @@ def build_floor_enemy_policies(
 
     policies: list[dict[str, Any]] = []
     previous_ids: list[str] = []
+    introduced_ids: set[str] = set()
     for floor_index, floor_analysis in enumerate(analyses):
         raw_target_rank = (floor_index + 0.5) / max(floor_count, 1) * max(len(candidates) - 1, 0)
+        hero = hero_projection[floor_index]["target"]
+        hero_atk_def_sum = float(hero.get("atk", 0.0)) + float(hero.get("def", 0.0))
+
+        def eligible_for_floor(item: dict[str, Any]) -> bool:
+            if selected_style != "red_sea" or item["id"] in introduced_ids:
+                return True
+            return float(item.get("atk", 0.0)) + float(item.get("def", 0.0)) >= hero_atk_def_sum
 
         def selection_score(item: dict[str, Any]) -> tuple[float, float, str]:
             combat = item["combat"]
             if not combat["killable"]:
-                return (1000.0, 1000.0, item["id"])
+                threshold_gap = max(float(combat.get("defense_threshold_gap") or 0.0), 0.0)
+                threshold_penalty = 2.0 + threshold_gap / max(float(hero.get("atk", 1.0)), 1.0)
+                raw_distance = abs(rank_by_id[item["id"]] - raw_target_rank) / max(len(candidates) - 1, 1)
+                return (threshold_penalty + raw_distance * 0.1, raw_distance, item["id"])
             difficulty_distance = abs(combat["difficulty_score"] - common_target) / max(common_target, 0.25)
             raw_distance = abs(rank_by_id[item["id"]] - raw_target_rank) / max(len(candidates) - 1, 1)
             hp_penalty = max(float(combat.get("battle_loss_hp_ratio") or 0.0) - 0.45, 0.0) * 4.0
@@ -2758,11 +3164,19 @@ def build_floor_enemy_policies(
         seen: set[str] = set()
 
         carry_target = min(len(previous_ids), int(max_types * overlap_ratio + 0.999999))
-        for enemy_id in sorted(previous_ids, key=lambda value: selection_score(by_id[value]))[:carry_target]:
+        carry_min_difficulty = common_target * 0.65 if selected_style == "red_sea" else 0.0
+        eligible_carry_ids = [
+            enemy_id
+            for enemy_id in previous_ids
+            if float(by_id[enemy_id]["combat"]["difficulty_score"]) >= carry_min_difficulty
+        ]
+        carried_ids: list[str] = []
+        for enemy_id in sorted(eligible_carry_ids, key=lambda value: selection_score(by_id[value]))[:carry_target]:
             item = by_id[enemy_id]
-            if item["combat"]["killable"] and enemy_id not in seen:
+            if enemy_id not in seen:
                 selected.append(item)
                 seen.add(enemy_id)
+                carried_ids.append(enemy_id)
 
         desired_roles = ["tank", "high attack", "balanced", "defense threshold"]
         if any(item["role"] == "magic attack specialist" for item in floor_analysis):
@@ -2774,7 +3188,7 @@ def build_floor_enemy_policies(
                 continue
             pool = [
                 item for item in floor_analysis
-                if item["id"] not in seen and item["role"] == role and item["combat"]["killable"]
+                if item["id"] not in seen and item["role"] == role and eligible_for_floor(item)
             ]
             if pool:
                 item = min(pool, key=selection_score)
@@ -2784,7 +3198,7 @@ def build_floor_enemy_policies(
         for item in sorted(floor_analysis, key=selection_score):
             if len(selected) >= max_types:
                 break
-            if item["id"] in seen or not item["combat"]["killable"]:
+            if item["id"] in seen or not eligible_for_floor(item):
                 continue
             selected.append(item)
             seen.add(item["id"])
@@ -2794,7 +3208,7 @@ def build_floor_enemy_policies(
             for item in sorted(floor_analysis, key=selection_score):
                 if len(selected) >= min_policy_types:
                     break
-                if item["id"] in seen or item["special"] or not item["combat"]["killable"]:
+                if item["id"] in seen or item["special"] or not eligible_for_floor(item):
                     continue
                 selected.append(item)
                 seen.add(item["id"])
@@ -2803,8 +3217,13 @@ def build_floor_enemy_policies(
         selected = sorted(selected[:max_types], key=lambda item: (item["combat"]["difficulty_score"], item["id"]))
         for item in selected:
             item["role"] = _enemy_floor_role(item, hero, selected)
-        difficulties = [item["combat"]["difficulty_score"] for item in selected]
+        difficulties = [
+            item["combat"]["difficulty_score"]
+            for item in selected
+            if item["combat"]["killable"]
+        ]
         raw_scores = [item["numeric_score"] for item in selected]
+        debut_ids = [item["id"] for item in selected if item["id"] not in introduced_ids]
         policies.append(
             {
                 "floor_index": floor_index,
@@ -2822,9 +3241,14 @@ def build_floor_enemy_policies(
                     "max": round(max(difficulties), 3) if difficulties else None,
                     "raw_strength_median": round(_quantile(raw_scores, 0.5), 3) if raw_scores else None,
                 },
+                "carried_enemy_ids": carried_ids,
+                "carry_min_difficulty": round(carry_min_difficulty, 3),
+                "debut_enemy_ids": debut_ids,
+                "debut_min_atk_def_sum": round(hero_atk_def_sum, 3) if selected_style == "red_sea" else None,
                 "fallback_no_special_enemy_ids": fallback_added,
             }
         )
+        introduced_ids.update(item["id"] for item in selected)
         previous_ids = [item["id"] for item in selected]
     return policies
 
@@ -4858,6 +5282,22 @@ def skill_path(repo_root: Path, name: str) -> Path:
     return repo_root / "skills" / name / "SKILL.md"
 
 
+def style_skill_name(style: str, stage: str) -> str:
+    selected_style = normalize_tower_style(style)
+    try:
+        return STYLE_SKILL_NAMES[selected_style][stage]
+    except KeyError as exc:
+        raise PipelineError(f"No skill configured for tower style {selected_style!r}, stage {stage!r}.") from exc
+
+
+def red_sea_prompt_bundle_fingerprint(repo_root: Path) -> str:
+    payload = {"version": RED_SEA_PROMPT_BUNDLE_VERSION}
+    for stage, name in STYLE_SKILL_NAMES["red_sea"].items():
+        path = skill_path(repo_root, name)
+        payload[stage] = path.read_text(encoding="utf-8")
+    return stable_hash(payload)
+
+
 def build_brief_prompt(args: argparse.Namespace, idea: str) -> str:
     requested_style = normalize_tower_style(getattr(args, "tower_style", None))
     style_profile = STYLE_LAYOUT_PROFILES[requested_style]
@@ -4877,7 +5317,7 @@ def build_brief_prompt(args: argparse.Namespace, idea: str) -> str:
     return textwrap.dedent(
         f"""
         Read and follow this skill file first:
-        {skill_path(args.repo_root, "design-traditional-mota-tower")}
+        {skill_path(args.repo_root, style_skill_name(requested_style, "brief"))}
 
         You are stage 0 of a code-orchestrated classic mota tower pipeline.
         Return only JSON matching the provided schema.
@@ -4989,22 +5429,19 @@ def build_enemy_design_prompt(
         - Update as many existing enemy slots as requested by target_updated_enemy_slots. If this
           equals the available slot count, rewrite every available enemy slot.
         - A later floor-generation stage may use only some of these enemies; the purpose is to give
-          monster-special enough choices across weak, medium, strong, and special-pressure roles.
-        - Progress role lanes rather than one HP/ATK/DEF staircase. A later enemy need not be greater
-          than an earlier enemy in every attribute; target-hero-relative difficulty controls progression.
-        - On every normal floor pool, provide: a high-HP tank with restrained ATK/DEF and above-median
-          combat rounds, a high-ATK enemy with low HP/DEF and at-most-median combat rounds, and a
-          balanced or defense-threshold enemy. Ordinary core enemies must
-          trade attributes; one must not have HP, ATK, and DEF all at least another ordinary core enemy.
-        - When allowed, provide a magic-attack specialist below the floor's raw-stat median and a zone
-          elite whose HP, ATK, and DEF are each at least the floor median. Magic pressure comes from its
-          ability; the zone elite is the explicit all-round-strong exception and must still be killable.
-        - Traditional floors may have at most one intentional low-tax/carryover enemy. Red-sea floors
-          must have none. Treat a plain enemy below 35% of its floor's median relative difficulty as low-tax.
-          Red-sea may still reuse an enemy id across adjacent floors, but it must remain in the ordinary
-          difficulty band and must not serve as a low-tax/carryover role.
-        - First-strike and repulse enemies should also express a clear stat tradeoff instead of receiving
-          the strongest HP, ATK, and DEF together.
+          encounter stage enough choices across weak, medium, strong, and special-pressure roles.
+        - Build a clear weak-to-strong tier ladder across the complete table. Later enemies need not be
+          greater in every attribute, but later raw-strength tiers must exist for later floor selection.
+        - Provide global role diversity across the table: high-HP, high-ATK, balanced, defense-threshold,
+          and allowed special-pressure options. No individual floor candidate pool must contain every role.
+        - A candidate is allowed to exceed the current floor's projected hero attack or otherwise be
+          temporarily unbeatable. Do not lower or remove a tier merely to make every candidate killable.
+        - For red-sea towers, scale later stat tiers against the full confirmed gems and potions available
+          before each floor. The median raw combat strength of later floor pools must rise as projected
+          hero ATK/DEF rises; do not let a fixed weak tier occupy most of several consecutive floor pools.
+        - For red-sea towers, when an enemy id first enters a floor candidate pool, its ATK+DEF sum must
+          be at least that floor's target projected hero ATK+DEF sum. Reusing that id on later floors is
+          exempt even when the later hero sum has grown.
         - Use only allowed_specials, and use at most one special per monster unless the brief says otherwise.
         - For special 15 (zone) and 18 (repulse), set zone/repulse/value so the damage is within
           the supplied red-potion ratio range; set range to 1 unless there is a clear reason.
@@ -5049,7 +5486,8 @@ def build_enemy_table_review_prompt(
         You are the dedicated enemy-table reviewer before any floor map is generated.
         Return only JSON matching the supplied schema. Do not judge final map placement or claim that
         the tower is globally solvable. Review the stat table together with projected hero growth and
-        the concrete per-floor enemy assignments.
+        the per-floor candidate assignments. Candidate enemies do not need to be immediately killable.
+        Emit only blocking failures; do not emit warnings.
 
         Input JSON:
         {prompt_json(payload)}
@@ -5174,7 +5612,7 @@ def enemy_table_review_issue(
     enemy_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
-        "severity": severity if severity in {"fail", "warn"} else "fail",
+        "severity": "fail",
         "floor_indices": sorted(set(floor_indices or [])),
         "enemy_ids": sorted(set(enemy_ids or [])),
         "reason": reason,
@@ -5190,14 +5628,9 @@ def local_enemy_table_review(
     issues: list[dict[str, Any]] = []
     floor_summaries: list[dict[str, Any]] = []
     all_active_ids: set[str] = set()
-    previous_median: float | None = None
-    monster_policy = brief.get("monster_policy", {})
-    if not isinstance(monster_policy, dict):
-        monster_policy = {}
-    allowed_specials = {
-        int(value) for value in monster_policy.get("allowed_specials", [1, 2, 3, 15, 18])
-        if isinstance(value, (int, float)) and not isinstance(value, bool)
-    }
+    previous_raw_median: float | None = None
+    raw_medians: list[float] = []
+    seen_enemy_ids: set[str] = set()
     selected_style = tower_style(brief)
     for floor_index, policy in enumerate(floor_policies):
         ids = [str(value) for value in policy.get("allowed_enemy_ids", [])]
@@ -5206,132 +5639,56 @@ def local_enemy_table_review(
         roles = policy.get("enemy_role_hints", {})
         families = policy.get("enemy_role_families", {})
         raw_strength = policy.get("enemy_raw_strength", {})
-        difficulties = [
-            float(metrics[enemy_id]["difficulty_score"])
-            for enemy_id in ids
-            if isinstance(metrics.get(enemy_id), dict) and metrics[enemy_id].get("killable") is True
-        ]
-        unkillable = [
-            enemy_id for enemy_id in ids
-            if not isinstance(metrics.get(enemy_id), dict) or metrics[enemy_id].get("killable") is not True
-        ]
-        median = _quantile(difficulties, 0.5) if difficulties else 0.0
-        round_median = _quantile(
-            [
-                float(metrics[enemy_id]["rounds"])
-                for enemy_id in ids
-                if isinstance(metrics.get(enemy_id), dict)
-                and isinstance(metrics[enemy_id].get("rounds"), (int, float))
-            ],
-            0.5,
-        )
         raw_values = [float(raw_strength.get(enemy_id, 0.0)) for enemy_id in ids]
         raw_median = _quantile(raw_values, 0.5) if raw_values else 0.0
+        raw_medians.append(raw_median)
         hp_median = _quantile([policy_number(enemys.get(enemy_id, {}).get("hp"), 0.0) for enemy_id in ids], 0.5)
         atk_median = _quantile([policy_number(enemys.get(enemy_id, {}).get("atk"), 0.0) for enemy_id in ids], 0.5)
         def_median = _quantile([policy_number(enemys.get(enemy_id, {}).get("def"), 0.0) for enemy_id in ids], 0.5)
-        low_tax_ids = [
-            enemy_id for enemy_id in ids
-            if not special_list(enemys.get(enemy_id, {}).get("special"))
-            and median > 0.2
-            and float(metrics.get(enemy_id, {}).get("difficulty_score", 0.0)) < median * 0.35
+        unkillable = [
+            enemy_id
+            for enemy_id in ids
+            if not isinstance(metrics.get(enemy_id), dict) or metrics[enemy_id].get("killable") is not True
         ]
-        ordinary_core_ids = [
-            enemy_id for enemy_id in ids
-            if enemy_id not in low_tax_ids
-            and not special_list(enemys.get(enemy_id, {}).get("special"))
-        ]
-        dominance_pairs: list[tuple[str, str]] = []
-        for dominant_id in ordinary_core_ids:
-            dominant_stats = tuple(
-                policy_number(enemys.get(dominant_id, {}).get(key), 0.0)
-                for key in ("hp", "atk", "def")
+        represented = {str(families.get(enemy_id, "special")) for enemy_id in ids}
+        debut_ids = [enemy_id for enemy_id in ids if enemy_id not in seen_enemy_ids]
+        hero_target = policy.get("estimated_hero_bands", {}).get("target", {})
+        hero_atk_def_sum = policy_number(hero_target.get("atk"), 0.0) + policy_number(
+            hero_target.get("def"), 0.0
+        )
+        weak_debut_ids = [
+            enemy_id
+            for enemy_id in debut_ids
+            if (
+                policy_number(enemys.get(enemy_id, {}).get("atk"), 0.0)
+                + policy_number(enemys.get(enemy_id, {}).get("def"), 0.0)
             )
-            for dominated_id in ordinary_core_ids:
-                if dominant_id == dominated_id:
-                    continue
-                dominated_stats = tuple(
-                    policy_number(enemys.get(dominated_id, {}).get(key), 0.0)
-                    for key in ("hp", "atk", "def")
-                )
-                if all(left >= right for left, right in zip(dominant_stats, dominated_stats)) and any(
-                    left > right for left, right in zip(dominant_stats, dominated_stats)
-                ):
-                    dominance_pairs.append((dominant_id, dominated_id))
+            < hero_atk_def_sum
+        ]
         floor_summaries.append(
             {
                 "floor_index": floor_index,
-                "hero_target": policy.get("estimated_hero_bands", {}).get("target", {}),
+                "hero_target": hero_target,
                 "enemy_ids": ids,
                 "roles": roles,
                 "difficulty_summary": policy.get("difficulty_summary", {}),
-                "round_median": round_median,
                 "attribute_medians": {"hp": hp_median, "atk": atk_median, "def": def_median},
-                "low_tax_enemy_ids": low_tax_ids,
-                "ordinary_attribute_dominance": [
-                    {"dominant": dominant, "dominated": dominated}
-                    for dominant, dominated in dominance_pairs
-                ],
+                "unkillable_enemy_ids": unkillable,
+                "role_families": sorted(represented),
+                "debut_enemy_ids": debut_ids,
+                "debut_min_atk_def_sum": hero_atk_def_sum if selected_style == "red_sea" else None,
             }
         )
         if len(ids) < min(max(int(brief.get("monster_policy", {}).get("monster_types_per_floor") or 9), 1), 4):
             issues.append(
                 enemy_table_review_issue(
                     "fail",
-                    f"Floor {floor_index} has only {len(ids)} usable enemy types.",
-                    "Provide at least four killable enemy choices or the configured lower maximum for this floor.",
+                    f"Floor {floor_index} has only {len(ids)} candidate enemy types.",
+                    "Provide at least four candidate enemy types or the configured lower maximum for this floor.",
                     [floor_index],
                     ids,
                 )
             )
-        if unkillable:
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} includes enemies that the target projected hero cannot damage: {', '.join(unkillable)}.",
-                    "Lower their defense or move them to a later floor where the target projected ATK exceeds effective defense.",
-                    [floor_index],
-                    unkillable,
-                )
-            )
-        if difficulties and max(difficulties) > max(median * 2.75, median + 1.5):
-            outliers = [
-                enemy_id for enemy_id in ids
-                if float(metrics.get(enemy_id, {}).get("difficulty_score", 0.0)) > max(median * 2.75, median + 1.5)
-            ]
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} has ordinary-pool difficulty outliers far above its median {median:.2f}: {', '.join(outliers)}.",
-                    "Reduce these enemies' battle loss or assign them only as an explicit later-floor/mini-boss tier.",
-                    [floor_index],
-                    outliers,
-                )
-            )
-        max_low_tax = 0 if selected_style == "red_sea" else 1
-        if len(low_tax_ids) > max_low_tax:
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} has {len(low_tax_ids)} low-tax ordinary enemies; style {selected_style} allows at most {max_low_tax}: {', '.join(low_tax_ids)}.",
-                    "Raise their target-hero-relative battle loss into the ordinary floor band. Red-sea floors must not contain low-tax/carryover enemies.",
-                    [floor_index],
-                    low_tax_ids,
-                )
-            )
-        if dominance_pairs:
-            involved = sorted({enemy_id for pair in dominance_pairs for enemy_id in pair})
-            pair_text = ", ".join(f"{dominant}>{dominated}" for dominant, dominated in dominance_pairs[:8])
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} ordinary core contains HP/ATK/DEF strict dominance instead of stat tradeoffs: {pair_text}.",
-                    "Lower at least one dominant attribute or raise a different dominated attribute so each ordinary core enemy has a distinct HP/ATK/DEF emphasis.",
-                    [floor_index],
-                    involved,
-                )
-            )
-        represented = {str(families.get(enemy_id, "special")) for enemy_id in ids}
         if len(ids) >= 4 and len(represented) < 3:
             issues.append(
                 enemy_table_review_issue(
@@ -5342,133 +5699,49 @@ def local_enemy_table_review(
                     ids,
                 )
             )
-        missing_core_roles: list[str] = []
-        if "tank" not in represented:
-            missing_core_roles.append("tank (high HP, medium-or-lower ATK/DEF)")
-        if "high attack" not in represented:
-            missing_core_roles.append("high attack (high ATK, low HP/DEF)")
-        if not represented.intersection({"balanced", "defense threshold"}):
-            missing_core_roles.append("balanced or defense threshold")
-        if missing_core_roles and len(ids) >= 4:
+        if selected_style == "red_sea" and weak_debut_ids:
+            details = ", ".join(
+                f"{enemy_id}={policy_number(enemys.get(enemy_id, {}).get('atk'), 0.0) + policy_number(enemys.get(enemy_id, {}).get('def'), 0.0):g}"
+                for enemy_id in weak_debut_ids
+            )
             issues.append(
                 enemy_table_review_issue(
                     "fail",
-                    f"Floor {floor_index} lacks required ordinary role tradeoffs: {', '.join(missing_core_roles)}.",
-                    "Reshape or reassign ordinary enemies to provide the missing roles without moving them outside the floor's target-hero-relative difficulty band.",
+                    f"Red-sea debut enemies on floor {floor_index} have ATK+DEF below projected hero ATK+DEF {hero_atk_def_sum:g}: {details}.",
+                    "Raise each debut enemy's ATK+DEF sum to the floor threshold or debut it on an earlier floor; later reuse is exempt.",
                     [floor_index],
+                    weak_debut_ids,
+                )
+            )
+        if (
+            selected_style == "red_sea"
+            and previous_raw_median is not None
+            and previous_raw_median > 0
+            and raw_median < previous_raw_median * 0.85
+        ):
+            issues.append(
+                enemy_table_review_issue(
+                    "fail",
+                    f"Red-sea raw enemy strength regresses from floor {floor_index - 1} to {floor_index}: {previous_raw_median:.2f} -> {raw_median:.2f}.",
+                    "Select a later raw-strength tier while retaining any still-relevant strong carryover enemies.",
+                    [floor_index - 1, floor_index],
                     ids,
                 )
             )
-        role_shape_mismatches: list[str] = []
-        for enemy_id in ids:
-            role = str(roles.get(enemy_id, ""))
-            rounds = metrics.get(enemy_id, {}).get("rounds") if isinstance(metrics.get(enemy_id), dict) else None
-            if role == "tank" and isinstance(rounds, (int, float)) and rounds < round_median:
-                role_shape_mismatches.append(f"{enemy_id}:tank rounds={rounds:g}<{round_median:g}")
-            if role == "high attack" and isinstance(rounds, (int, float)) and rounds > round_median:
-                role_shape_mismatches.append(f"{enemy_id}:high-attack rounds={rounds:g}>{round_median:g}")
-        if role_shape_mismatches:
-            mismatch_ids = sorted({value.split(":", 1)[0] for value in role_shape_mismatches})
+        previous_raw_median = raw_median
+        seen_enemy_ids.update(ids)
+
+    if selected_style == "red_sea" and len(raw_medians) >= 3 and raw_medians[0] > 0:
+        if raw_medians[-1] < raw_medians[0] * 1.35:
             issues.append(
                 enemy_table_review_issue(
                     "fail",
-                    f"Floor {floor_index} role shapes do not produce the intended round-count contrast: {', '.join(role_shape_mismatches)}.",
-                    "Make tanks take at least the floor-median rounds and high-attack enemies take at most the floor-median rounds while preserving their stat tradeoffs.",
-                    [floor_index],
-                    mismatch_ids,
+                    f"Red-sea enemy tiers do not grow enough across the tower: first median {raw_medians[0]:.2f}, final median {raw_medians[-1]:.2f}.",
+                    "Provide a clear later raw-strength tier so monster capability grows with the tower.",
+                    list(range(len(floor_policies))),
+                    sorted(all_active_ids),
                 )
             )
-        magic_ids = [enemy_id for enemy_id in ids if 2 in special_list(enemys.get(enemy_id, {}).get("special"))]
-        if 2 in allowed_specials and len(ids) >= 4 and not magic_ids:
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} has no magic-attack specialist although special 2 is allowed.",
-                    "Assign one below-median raw-stat enemy whose pressure comes from magic attack.",
-                    [floor_index],
-                    ids,
-                )
-            )
-        for enemy_id in magic_ids:
-            if raw_median > 0 and float(raw_strength.get(enemy_id, 0.0)) > raw_median:
-                issues.append(
-                    enemy_table_review_issue(
-                        "fail",
-                        f"Magic-attack enemy {enemy_id} on floor {floor_index} has raw strength above the floor median.",
-                        "Lower its HP/ATK/DEF chassis below the floor raw median; magic attack must create its distinction.",
-                        [floor_index],
-                        [enemy_id],
-                    )
-                )
-        zone_ids = [enemy_id for enemy_id in ids if 15 in special_list(enemys.get(enemy_id, {}).get("special"))]
-        if 15 in allowed_specials and len(ids) >= 4 and not zone_ids:
-            issues.append(
-                enemy_table_review_issue(
-                    "fail",
-                    f"Floor {floor_index} has no zone elite although special 15 is allowed.",
-                    "Assign one zone enemy with HP, ATK, and DEF each at least the floor median, while keeping expected loss valid for the projected hero.",
-                    [floor_index],
-                    ids,
-                )
-            )
-        for enemy_id in zone_ids:
-            enemy = enemys.get(enemy_id, {})
-            if not (
-                policy_number(enemy.get("hp"), 0.0) >= hp_median
-                and policy_number(enemy.get("atk"), 0.0) >= atk_median
-                and policy_number(enemy.get("def"), 0.0) >= def_median
-            ):
-                issues.append(
-                    enemy_table_review_issue(
-                        "fail",
-                        f"Zone enemy {enemy_id} on floor {floor_index} is not an all-round elite relative to the floor medians.",
-                        "Raise its below-median HP/ATK/DEF attributes so all three reach the floor median, then rebalance expected loss against the projected hero.",
-                        [floor_index],
-                        [enemy_id],
-                    )
-                )
-        for enemy_id in ids:
-            specials = set(special_list(enemys.get(enemy_id, {}).get("special")))
-            if not specials.intersection({1, 18}):
-                continue
-            enemy = enemys.get(enemy_id, {})
-            if (
-                policy_number(enemy.get("hp"), 0.0) >= hp_median
-                and policy_number(enemy.get("atk"), 0.0) >= atk_median
-                and policy_number(enemy.get("def"), 0.0) >= def_median
-            ):
-                issues.append(
-                    enemy_table_review_issue(
-                        "fail",
-                        f"First-strike/repulse enemy {enemy_id} on floor {floor_index} stacks above-median HP, ATK, and DEF.",
-                        "Lower at least one core attribute so its special behavior accompanies a clear stat tradeoff; reserve all-round strength for the zone elite.",
-                        [floor_index],
-                        [enemy_id],
-                    )
-                )
-        if previous_median is not None and previous_median > 0 and median > 0:
-            ratio = median / previous_median
-            if ratio > 1.65 or ratio < 0.55:
-                issues.append(
-                    enemy_table_review_issue(
-                        "fail",
-                        f"Relative median difficulty jumps from floor {floor_index - 1} to {floor_index}: ratio={ratio:.2f}.",
-                        "Adjust the two adjacent pools or enemy stats so target-hero-relative median difficulty remains broadly comparable.",
-                        [floor_index - 1, floor_index],
-                        ids,
-                    )
-                )
-            elif ratio > 1.35 or ratio < 0.72:
-                issues.append(
-                    enemy_table_review_issue(
-                        "warn",
-                        f"Relative median difficulty changes noticeably from floor {floor_index - 1} to {floor_index}: ratio={ratio:.2f}.",
-                        "Smooth the adjacent floor pools unless the progression plan explicitly calls for a spike or relief floor.",
-                        [floor_index - 1, floor_index],
-                        ids,
-                    )
-                )
-        previous_median = median
 
     if all_active_ids:
         no_special = [enemy_id for enemy_id in all_active_ids if not special_list(enemys.get(enemy_id, {}).get("special"))]
@@ -5493,10 +5766,18 @@ def local_enemy_table_review(
 
 
 def merge_enemy_table_reviews(local_review: dict[str, Any], llm_review: dict[str, Any] | None) -> dict[str, Any]:
-    issues = list(local_review.get("issues", []))
+    issues = [
+        item
+        for item in local_review.get("issues", [])
+        if isinstance(item, dict) and item.get("severity") == "fail"
+    ]
     summaries = [str(local_review.get("summary", ""))]
     if isinstance(llm_review, dict):
-        issues.extend(item for item in llm_review.get("issues", []) if isinstance(item, dict))
+        issues.extend(
+            item
+            for item in llm_review.get("issues", [])
+            if isinstance(item, dict) and item.get("severity") == "fail"
+        )
         summaries.append(str(llm_review.get("summary", "")))
     status = "fail" if any(issue.get("severity") == "fail" for issue in issues) else "pass"
     return {
@@ -5757,7 +6038,7 @@ def layout_constraints_summary(brief: dict[str, Any]) -> dict[str, Any]:
     route_min, route_max = route_family_range(brief)
     selected_style = tower_style(brief)
     profile = STYLE_LAYOUT_PROFILES[selected_style]
-    return {
+    summary = {
         "tower_style": selected_style,
         "wall_ratio_min": min_ratio,
         "wall_ratio_max": max_ratio,
@@ -5778,6 +6059,24 @@ def layout_constraints_summary(brief: dict[str, Any]) -> dict[str, Any]:
         "high_value_pocket_threshold": high_value_pocket_threshold(brief),
         "note": "These are generation and review targets; final LLM output may need manual adjustment.",
     }
+    if selected_style == "red_sea":
+        summary.update(
+            {
+                "occupied_non_wall_ratio_min": profile.get("occupied_non_wall_ratio_min"),
+                "occupied_non_wall_ratio_max": profile.get("occupied_non_wall_ratio_max"),
+                "spatial_density_range_target": profile.get("spatial_density_range_target"),
+                "spatial_density_range_max": profile.get("spatial_density_range_max"),
+                "topology_spatial_density_range_max": profile.get("topology_spatial_density_range_max"),
+                "empty_ground_min": profile.get("empty_ground_min"),
+                "wall_fragmentation_min_score": profile.get("wall_fragmentation_min_score"),
+                "wall_component_min": profile.get("wall_component_min"),
+                "small_wall_share_min": profile.get("small_wall_share_min"),
+                "wall_transition_ratio_min": profile.get("wall_transition_ratio_min"),
+                "max_interior_wall_run": profile.get("max_interior_wall_run"),
+                "junction_share_min": profile.get("junction_share_min"),
+            }
+        )
+    return summary
 
 
 def minimal_repair_feedback(feedback: dict[str, Any] | None) -> dict[str, Any]:
@@ -5861,7 +6160,7 @@ def build_topology_prompt(
     return textwrap.dedent(
         f"""
         Read and follow this skill file first:
-        {skill_path(args.repo_root, "topology-mota-floor")}
+        {skill_path(args.repo_root, style_skill_name(tower_style(brief), "topology"))}
 
         You are stage 1 of a staged per-floor pipeline. Return only JSON matching the provided schema.
         Generate a complete floor object plus annotations, but only place:
@@ -5881,7 +6180,7 @@ def build_topology_prompt(
         Preserve downstream capacity for the required non-adjacent enemy minimum, several meaningful
         door sites, and staged resource cells; topology_capacity will be checked from the actual map.
         If repair_feedback is present, repair current_stage_output_to_repair only for the listed topology issue.
-        Keep downstream hard constraints in mind but do not solve economy or monster placement in this stage.
+        Keep downstream hard constraints in mind but do not solve economy or encounter placement in this stage.
         Analyze the actual few-shot maps and route graphs in few_shot_reference_floors before designing.
         Reuse their structural relationships and route grammar, not their local numeric tile codes or exact wall mask.
         Implement the tower_brief.floor_progression_plan entry matching this floor_index; it defines
@@ -5923,26 +6222,25 @@ def build_economy_prompt(
     return textwrap.dedent(
         f"""
         Read and follow this skill file first:
-        {skill_path(args.repo_root, "economy-mota-floor")}
+        {skill_path(args.repo_root, style_skill_name(tower_style(brief), "economy"))}
 
         You are stage 2 of a staged per-floor pipeline. Return only JSON matching the provided schema.
-        Start from topology_output. Preserve its floor size, floor id, stairs, route structure, and most walls.
-        Add doors, keys, resources, tools, and route-tax annotations within the supplied budget.
-        Do not place final enemy tiles. For combat pressure, place only annotations such as
-        combat_chokepoint, reward_guard, route_tax, special_candidate, and mini_boss_candidate.
-        Treat floor_contract.resource_limits, when present, as exact quotas for this floor's tracked resources.
+        Start from topology_output. Preserve its floor size, floor id, stairs, route structure, and every wall.
+        Add keys, resources, tools, and pressure-intent annotations within the supplied budget.
+        Do not place doors or enemies. Door quotas remain pending for the encounter stage.
+        Treat every non-door value in floor_contract.resource_limits as an exact floor quota.
         Control the entrance free region: no naked tool and no large resource exposure before cost.
         Disperse by real access cost: >=1/4 of floor gems (min 2) in one region or >=1/3 (min 3)
-        across a one-door/one-wall link fails; a decorative guard is not dispersion.
+        across one low-cost connector fails; an annotation alone is not protection.
         Follow tower_brief.tower_style: traditional style uses clear regions, multiple branch types,
         70%-90% protected important resources, and 0%-10% key/resource safety margin; red_sea style
         distributes rewards across narrow branches and protects nearly every valuable reward. Resource
         totals remain the user's budget.
         If repair_feedback is present, repair current_stage_output_to_repair only for the listed economy issue
         and keep the topology stable.
-        Use few_shot_reference_floors as real examples of door/key ordering, route compensation,
+        Use few_shot_reference_floors as real examples of key distribution, route compensation,
         and staged resource reachability. Do not copy source-project tile codes.
-        Balance each candidate route as a cost/reward tradeoff across door/key cost, tool commitment,
+        Balance each candidate route as a cost/reward tradeoff across intended pressure, tool commitment,
         expected combat or special pressure, detour length, and reachable rewards. No route may be all
         cost, and no route may be both cheaper and richer than every alternative.
         Realize the matching tower_brief.floor_progression_plan entry rather than spending the floor
@@ -5956,7 +6254,7 @@ def build_economy_prompt(
     ).strip()
 
 
-def build_monster_special_prompt(
+def build_encounter_prompt(
     args: argparse.Namespace,
     brief: dict[str, Any],
     floor_index: int,
@@ -5978,24 +6276,26 @@ def build_monster_special_prompt(
     )
     payload["economy_output"] = economy_output
     payload["downstream_hard_constraints_summary"] = downstream_hard_constraints_summary(
-        "monster", brief, limits, used, floor_policy, floor_contract
+        "encounter", brief, limits, used, floor_policy, floor_contract
     )
-    payload["few_shot_reference_floors"] = few_shot_stage_input(args, "monster", floor_index)
+    payload["few_shot_reference_floors"] = few_shot_stage_input(args, "encounter", floor_index)
     payload["estimated_hero_before_floor"] = (floor_policy or {}).get("estimated_hero_before_floor", {})
     return textwrap.dedent(
         f"""
         Read and follow this skill file first:
-        {skill_path(args.repo_root, "monster-special-mota-floor")}
+        {skill_path(args.repo_root, style_skill_name(tower_style(brief), "encounter"))}
 
         You are stage 3 of a staged per-floor pipeline. Return only JSON matching the provided schema.
-        Start from economy_output. Preserve topology and economy except for necessary small coordinate
-        adjustments to avoid adjacency, blocked routes, or invalid pressure.
-        Replace combat and special annotations with concrete enemy tile codes selected only from
+        Start from economy_output. Preserve every wall, stair, key, resource, tool, and other non-ground
+        economy tile exactly. Only replace empty ground with a legal door or allowed enemy.
+        Jointly place the exact door quotas from floor_contract.resource_limits and concrete enemies selected from
         current_floor_policy.allowed_enemy_ids and current_floor_policy.allowed_enemy_codes.
         Place between {monster_policy_int(brief, "enemy_count_min_per_floor")} and
         {monster_policy_int(brief, "enemy_count_max_per_floor")} total enemy tiles on this floor. If the economy
         annotations contain fewer combat slots, add extra non-adjacent route-tax, reward-guard,
-        branch-blocking, or pressure enemies on valid ground cells while preserving economy quotas.
+        branch-blocking, or pressure enemies on valid ground cells while preserving economy exactly.
+        Treat doors and monsters as one route-pressure system. Every door must buy reward access,
+        a shortcut, a route change, or a safer combat profile; stronger doors require stronger compensation.
         Make same-floor monster roles meaningfully different. Zone and repulse monsters must affect a
         real route, reward entrance, shortcut, or key junction. Enforce the special whitelist,
         max_specials_per_monster, and no orthogonally adjacent enemies.
@@ -6008,9 +6308,9 @@ def build_monster_special_prompt(
         must sit in a linear corridor with at least one empty retreat cell behind an approach direction;
         that retreat cell must continue into another path so approach direction changes subsequent play.
         If repair_feedback is present, repair current_stage_output_to_repair only for the listed
-        monster/special issue and do not rebuild economy.
-        Use the actual few-shot enemy placements and used enemys.js records to learn route roles,
-        threshold pressure, and special coverage. Scale to this tower and obey its whitelist.
+        encounter issue and do not rebuild economy.
+        Use the actual few-shot door and enemy placements plus used enemys.js records to learn route roles,
+        gate pressure, thresholds, and special coverage. Scale to this tower and obey its whitelist.
         Tower style controls placement grammar only, not monster HP/ATK/DEF difficulty. Do not add
         unsupported clamp, drain, self-destruct, lamp, arrow, one-way, or scripted mechanics.
         Preserve and realize the matching tower_brief.floor_progression_plan combat and carry intent.
@@ -6045,45 +6345,24 @@ Required checks:
 Return structured issues with owner_stage="topology".
 """,
     "economy": """
-Focus only on doors, keys, resources, tools, route-tax annotations, and budget.
+Focus only on keys, resources, tools, pressure intent, and non-door budget.
 
 Required checks:
-- No final enemy tiles are placed yet.
-- floor_contract.resource_limits, when present, are treated as exact tracked-resource quotas for this floor.
+- No door or enemy tiles are placed yet.
+- Non-door floor_contract.resource_limits are exact quotas; door quotas remain pending.
 - Whole-tower remaining budget is not exceeded.
 - Entrance free region exposes no naked tool or unprotected important-resource cluster.
-- Resource clusters are protected by door, route length, wall/tool pressure, special candidate, or combat slot.
+- Resource clusters have a real route commitment or a concrete downstream pressure intent.
 - Disperse by real access cost: >=1/4 of floor gems (min 2) in one region or >=1/3 (min 3) across a one-door/one-wall link fails; a decorative guard is not dispersion.
 - Traditional style targets 70%-90% protected important resources, 0%-10% key/resource safety margin,
   and an average of 0.5-2 placed tools per floor when the user's whole-tower budget permits.
-- Door/key ordering is plausible and avoids deadlocks.
-- Blue-door and tool routes receive stronger compensation than yellow-door baseline routes.
-- Every route balances door/key cost, tool commitment, expected combat/special pressure, detour length, and reachable reward; reject an all-cost route or a route that is both cheaper and richer than all alternatives.
+- Keys are distributed across meaningful access stages rather than bunched at the entrance.
+- Every route balances intended pressure, tool commitment, detour length, and reachable reward; reject an all-cost route or a route that is both cheaper and richer than all alternatives.
 - Combat slots and special candidates are positioned where the next stage can create real pressure.
 - A high-value pocket is invalid if its entrance has no door, combat slot, special candidate, tool requirement, or route commitment.
-- Economy may make small wall adjustments when needed to make broken-wall pockets, tool routes, or shortcuts actually costed.
+- Economy preserves every wall; structural insufficiency returns to topology.
 
 Return structured issues with owner_stage="economy".
-""",
-    "monster": """
-Focus only on concrete monster and special ability placement.
-
-Required checks:
-- Every enemy id/code is allowed by current_floor_policy.
-- Combat annotations have been replaced by concrete enemy tiles or intentionally removed with compensation.
-- Same-floor monster roles differ across route cost, reward guards, chokepoints, and optional pressure.
-- Judge combat thresholds and expected HP loss against current_floor_policy.estimated_hero_before_floor, not only raw enemy ordering.
-- Zone and repulse monsters affect a real route, reward entrance, shortcut, or key junction.
-- Every zone/repulse placement reports affected cells, affected route or reward entrance, and compensation.
-- A zone enemy uses a range-1 cross on a wall-constrained node with exactly 2-3 effective passable affected cells.
-- A repulse enemy sits in a linear corridor with a valid empty retreat cell that continues into another path.
-- Special abilities obey the whitelist and max_specials_per_monster.
-- Traditional style targets 2-6 meaningful special-pressure positions when the whitelist permits.
-- No enemy tiles are orthogonally adjacent.
-- Topology and economy are not rebuilt except for small necessary coordinate fixes.
-- Prefer pocket entrances, offset gaps, route merges, tool-route entries, and shortcut joins over decorative corridor filler.
-
-Return structured issues with owner_stage="monster".
 """,
     "integration": """
 Focus on whether the three staged outputs compose into one valid floor.
@@ -6091,7 +6370,7 @@ Focus on whether the three staged outputs compose into one valid floor.
 Required checks:
 - Final floor still satisfies topology legality, dimensions, stairs, floor id, and connectivity.
 - Economy changes did not destroy candidate route structure.
-- Monster placement did not break door/key/resource ordering or create illegal adjacency.
+- Encounter placement did not move economy content, deadlock key/door access, or create illegal adjacency.
 - Final tracked-resource budget is correct.
 - Final floor has real battle pressure, key/resource pressure, protected rewards, and perceivable special pressure.
 - Broken walls serve economy: fragmented pockets or gaps must affect access cost, reward protection, tool value, special pressure, or route choice.
@@ -6101,6 +6380,48 @@ Required checks:
 
 If an issue belongs to a specific earlier stage, set owner_stage to that earliest stage. Use owner_stage="integration"
 only when the problem is truly caused by cross-stage composition, and describe which earliest stage should change.
+""",
+}
+
+RED_SEA_STAGED_REVIEWER_SCOPES = {
+    "topology": """
+Focus only on red-sea structural topology.
+
+Required checks:
+- Keep the common floor schema, legal tiles, stairs, connectivity, and exact topology-stage scope.
+- Require 4-5 meaningful route families and at least 16 graph-validated local opportunities.
+- Use input.static_metrics.red_sea_density_fragmentation rather than annotation claims.
+- Reject a fragmentation_score below 3, a macro-zone topology density range above 0.40, or a non-wall junction share below 0.42.
+- Reject long clean corridors, large open rooms, bulky wall masses, decorative wall confetti, and concentration of all route structure in one side.
+- Require short purposeful wall groups, offset gaps, narrow route segments, frequent local branches, and rejoins.
+- Require non-negative topology_capacity.red_sea_capacity_slack so the exact resource quota, minimum enemies, and empty-ground reserve can fit.
+
+Return structured issues with owner_stage="topology".
+""",
+    "economy": """
+Focus only on red-sea keys, resources, tools, pressure intent, and non-door budget.
+
+Required checks:
+- Preserve topology exactly and place no doors or enemies.
+- Treat non-door floor_contract.resource_limits as exact quotas and distribute each major resource type across access regions.
+- Keep macro-region total density close without giving every region the same resource recipe.
+- Protect nearly every valuable reward; protect every tool with cost or a concrete route payoff.
+- Reject a dense resource pile, a mostly free route, or one region holding the floor's meaningful economy.
+- Keep enough valid pressure positions in every sparse region for the encounter stage to finish density balancing.
+
+Return structured issues with owner_stage="economy".
+""",
+    "integration": """
+Focus on whether the final floor is a valid red-sea composition.
+
+Required checks:
+- Preserve all common legality, connectivity, budget, progression, route-balance, and special-pressure checks.
+- Require occupied_non_wall_ratio >= 0.65 and visual_density_range <= 0.32 from red_sea_density_fragmentation metrics.
+- Require resources to remain spatially dispersed and access-cost staged even though total regional density is close.
+- Reject sparse adjacent macro-regions, long clean route sections, decorative fragments, resource piles, and density created by meaningless filler.
+- Require each region to have a distinct mix of combat, door/key, tool, or protected-resource roles.
+
+Assign each failure to the earliest repairable stage.
 """,
 }
 
@@ -6145,7 +6466,7 @@ def staged_review_prompt(
         "layout_constraints": layout_constraints_summary(brief),
         "few_shot_reference_floors": few_shot_stage_input(
             args,
-            stage if stage in {"topology", "economy", "monster", "integration"} else "integration",
+            stage if stage in {"topology", "economy", "integration"} else "integration",
             int(stage_output.get("floor_index", 0)),
             "reviewer",
         ),
@@ -6153,12 +6474,12 @@ def staged_review_prompt(
     return textwrap.dedent(
         f"""
         Read and follow this skill file first:
-        {skill_path(args.repo_root, "review-mota-floor")}
+        {skill_path(args.repo_root, style_skill_name(tower_style(brief), "review"))}
 
         You are the {stage}-reviewer in a staged per-floor pipeline. Return only JSON matching
         the provided structured review schema. Every issue must be an object with:
         owner_stage, severity, repair_stage, coordinates, reason, required_change.
-        repair_stage must be topology, economy, or monster and must name the earliest generator
+        repair_stage must be topology, economy, or encounter and must name the earliest generator
         that can make the requested change, including for cross-stage integration findings.
         Use severity="fail" only when the issue must trigger repair. Use severity="warn" for non-blocking notes.
         Do not emit string issues.
@@ -6175,13 +6496,71 @@ def staged_review_prompt(
         upstream_stage_maps contains the complete map matrix and annotations for every available earlier
         generator stage, with only unrelated empty floor boilerplate omitted. Compare stage_output against
         those exact coordinate baselines. Do not infer preservation from summaries, annotations, or tile
-        counts alone. Economy review must compare against topology; monster and integration review must
-        compare against both topology and economy.
+        counts alone. Economy review must compare against topology; final integration review must compare
+        against both topology and economy.
         Also verify that the matching tower_brief.floor_progression_plan entry is materially expressed
         by the map, not merely repeated in annotations or summary text.
 
         Reviewer scope:
-        {STAGED_REVIEWER_SCOPES[stage]}
+        {(RED_SEA_STAGED_REVIEWER_SCOPES if tower_style(brief) == "red_sea" else STAGED_REVIEWER_SCOPES)[stage]}
+
+        {tile_catalog}
+
+        Input JSON:
+        {prompt_json(payload)}
+        """
+    ).strip()
+
+
+def final_candidate_selection_prompt(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    floor_index: int,
+    candidates: list[dict[str, Any]],
+    used: dict[str, int],
+    limits: dict[str, int | None],
+    floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+) -> str:
+    maps, enemys = load_project_tables(args)
+    tile_catalog = build_tile_catalog(maps, enemys, brief, floor_policy)
+    payload = {
+        "tower_brief": compact_tower_brief_for_prompt(brief),
+        "floor_index": floor_index,
+        "current_floor_policy": floor_policy or {},
+        "used_budget_so_far": used,
+        "remaining_whole_tower_budget": remaining_budget(limits, used),
+        "floor_contract": floor_contract or {},
+        "layout_constraints": layout_constraints_summary(brief),
+        "candidates": [
+            {
+                "candidate_id": candidate["candidate_id"],
+                "floor_output": candidate["encounter_output"],
+                "previous_review": candidate.get("review") or {},
+            }
+            for candidate in candidates
+        ],
+        "few_shot_reference_floors": few_shot_stage_input(
+            args, "integration", floor_index, "reviewer"
+        ),
+    }
+    reviewer_scope = (
+        RED_SEA_STAGED_REVIEWER_SCOPES if tower_style(brief) == "red_sea" else STAGED_REVIEWER_SCOPES
+    )["integration"]
+    return textwrap.dedent(
+        f"""
+        You are the final candidate selector for one generated floor. Return only JSON matching
+        the provided schema. The candidates are complete alternative versions of the same floor.
+        Choose exactly one candidate_id; do not generate, repair, or merge floor content.
+
+        Compare the actual maps and annotations against the confirmed brief, floor policy, budget,
+        and integration criteria below. Previous review feedback is evidence about each candidate,
+        but the latest candidate is not automatically better and an earlier rejected candidate may
+        be the best overall choice. Prefer a candidate that satisfies hard constraints, then the one
+        with the fewest and least serious remaining quality problems. Keep the summary concise.
+
+        Integration criteria:
+        {reviewer_scope}
 
         {tile_catalog}
 
@@ -6230,6 +6609,7 @@ def run_staged_review(
     enforce_resource_progression: bool,
     topology_output: dict[str, Any] | None = None,
     economy_output: dict[str, Any] | None = None,
+    run_llm_review: bool = True,
 ) -> dict[str, Any]:
     expected_floor_id = f"{args.floor_prefix}{int(stage_output.get('floor_index', 0)) + args.floor_number_offset}"
     if stage_output.get("floor_index") != prefix_stage_floor_index(prefix):
@@ -6246,10 +6626,15 @@ def run_staged_review(
             args.wall_ratio_min,
             args.wall_ratio_max,
             brief,
+            floor_contract,
         )
         delta = empty_budget()
         metrics = floor_static_metrics(stage_output, maps, enemys, brief)
-        metrics["topology_capacity"] = topology_capacity_metrics(stage_output, maps, brief)
+        metrics["topology_capacity"] = topology_capacity_metrics(stage_output, maps, brief, floor_contract)
+        if tower_style(brief) == "red_sea":
+            metrics["red_sea_density_fragmentation"] = spatial_density_and_fragmentation_metrics(
+                stage_output, maps
+            )
     elif stage == "economy":
         issues, delta = economy_stage_review_issues(
             stage_output,
@@ -6264,21 +6649,10 @@ def run_staged_review(
             enforce_resource_progression,
         )
         metrics = floor_static_metrics(stage_output, maps, enemys, brief)
-    elif stage == "monster":
-        issues, delta, metrics = monster_stage_review_issues(
-            stage_output,
-            expected_floor_id,
-            floor_size,
-            brief,
-            maps,
-            enemys,
-            limits,
-            used,
-            previous_floor_outputs,
-            floor_policy,
-            enforce_resource_progression,
-            args.max_wall_similarity,
-        )
+        if tower_style(brief) == "red_sea":
+            metrics["red_sea_density_fragmentation"] = spatial_density_and_fragmentation_metrics(
+                stage_output, maps
+            )
     elif stage == "integration":
         issues, delta, metrics = integration_stage_review_issues(
             stage_output,
@@ -6291,6 +6665,8 @@ def run_staged_review(
             used,
             previous_floor_outputs,
             floor_policy,
+            floor_contract,
+            economy_output,
             enforce_resource_progression,
             args.max_wall_similarity,
         )
@@ -6302,6 +6678,33 @@ def run_staged_review(
             maps,
             enemys,
         )
+        if tower_style(brief) == "red_sea":
+            red_sea_metrics = spatial_density_and_fragmentation_metrics(stage_output, maps)
+            metrics["red_sea_density_fragmentation"] = red_sea_metrics
+            density_range = float(red_sea_metrics.get("visual_density_range", 0.0))
+            max_density_range = float(STYLE_LAYOUT_PROFILES["red_sea"]["spatial_density_range_max"])
+            if red_sea_metrics.get("available") and density_range > max_density_range:
+                issues.append(
+                    structured_issue(
+                        "encounter",
+                        "fail",
+                        f"Final red-sea macro-zone visual density range is {density_range:.2f}, above {max_density_range:.2f}; the floor still has visibly sparse regions.",
+                        "Redistribute meaningful route-tax and reward-guard monsters into sparse regions without moving the already dispersed resource quotas into a pile.",
+                        repair_stage="encounter",
+                    )
+                )
+            occupied_ratio = float(red_sea_metrics.get("occupied_non_wall_ratio", 0.0))
+            min_occupied = float(STYLE_LAYOUT_PROFILES["red_sea"]["occupied_non_wall_ratio_min"])
+            if red_sea_metrics.get("available") and occupied_ratio < min_occupied:
+                issues.append(
+                    structured_issue(
+                        "encounter",
+                        "fail",
+                        f"Final red-sea occupied non-wall ratio is {occupied_ratio:.2f}, below {min_occupied:.2f}.",
+                        "Use remaining valid combat roles in sparse route regions; preserve resource dispersion and do not add decorative filler.",
+                        repair_stage="encounter",
+                    )
+                )
         resource_region_review = gem_route_balance_review(
             brief,
             stage_output,
@@ -6332,7 +6735,7 @@ def run_staged_review(
         f"Local {stage} review {'failed' if any(issue['severity'] == 'fail' for issue in issues) else 'passed'}.",
     )
     write_json(prefix.with_suffix(f".review.{stage}.local.json"), local_review)
-    if local_review["status"] != "pass":
+    if local_review["status"] != "pass" or not run_llm_review:
         return local_review
 
     llm_review = agent_exec(
@@ -6358,6 +6761,107 @@ def run_staged_review(
     review = merge_structured_stage_reviews(stage, local_review, llm_review, delta)
     write_json(prefix.with_suffix(f".review.{stage}.merged.json"), review)
     return review
+
+
+def deferred_final_stage_review(
+    floor_index: int,
+    attempt: int,
+    stage: str,
+) -> dict[str, Any]:
+    return {
+        "status": "deferred",
+        "issues": [],
+        "required_changes": [],
+        "budget_delta": empty_budget(),
+        "summary": (
+            f"MT{floor_index} attempt {attempt} {stage} review was deferred to final candidate selection."
+        ),
+        "attempt": attempt,
+        "stage": stage,
+    }
+
+
+def complete_floor_candidate(
+    floor_index: int,
+    attempt: int,
+    topology_output: dict[str, Any],
+    economy_output: dict[str, Any],
+    encounter_output: dict[str, Any],
+    review: dict[str, Any] | None,
+    rejected_at: str,
+    maps: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "candidate_id": f"MT{floor_index}-attempt{attempt}",
+        "attempt": attempt,
+        "rejected_at": rejected_at,
+        "topology_output": core_clone(topology_output),
+        "economy_output": core_clone(economy_output),
+        "encounter_output": core_clone(encounter_output),
+        "review": core_clone(review) if isinstance(review, dict) else {},
+        "budget_delta": derive_budget_delta(encounter_output.get("floor", {}), maps),
+    }
+
+
+def write_complete_candidate_archive(
+    args: argparse.Namespace,
+    floor_index: int,
+    candidates: list[dict[str, Any]],
+) -> None:
+    write_json(args.out_dir / "floors" / f"MT{floor_index}.candidates.json", candidates)
+
+
+def select_final_floor_candidate(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    floor_index: int,
+    candidates: list[dict[str, Any]],
+    used: dict[str, int],
+    limits: dict[str, int | None],
+    floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not candidates:
+        raise PipelineError(f"MT{floor_index} has no complete candidates for final selection.")
+    selection = agent_exec(
+        args,
+        final_candidate_selection_prompt(
+            args,
+            brief,
+            floor_index,
+            candidates,
+            used,
+            limits,
+            floor_policy,
+            floor_contract,
+        ),
+        FINAL_CANDIDATE_SELECTION_SCHEMA,
+        args.out_dir / "floors" / f"MT{floor_index}.final-selection.json",
+    )
+    selected_id = str(selection.get("selected_candidate_id", ""))
+    selected = next(
+        (candidate for candidate in candidates if candidate["candidate_id"] == selected_id),
+        None,
+    )
+    if selected is None:
+        allowed = ", ".join(candidate["candidate_id"] for candidate in candidates)
+        raise PipelineError(
+            f"MT{floor_index} selector returned unknown candidate {selected_id!r}; expected one of: {allowed}."
+        )
+    review = {
+        "status": "pass",
+        "issues": [],
+        "required_changes": [],
+        "budget_delta": normalize_delta(selected.get("budget_delta")),
+        "summary": str(selection.get("summary", "Selected the best available complete candidate."))[:1600],
+        "best_effort_selection": True,
+        "selected_candidate_id": selected_id,
+        "candidate_count": len(candidates),
+        "attempt": int(selected.get("attempt", 0)),
+        "selection": selection,
+        "selected_candidate_previous_review": selected.get("review", {}),
+    }
+    return selected, review
 
 
 def prefix_stage_floor_index(prefix: Path) -> int:
@@ -6772,7 +7276,7 @@ def compact_exception_message(exc: BaseException, limit: int = 600) -> str:
 
 
 def retry_stage_after_exception(stage: str) -> str:
-    return stage if stage in STAGE_ORDER else "monster"
+    return stage if stage in STAGE_ORDER else "encounter"
 
 
 def stage_exception_payload(
@@ -7001,9 +7505,14 @@ def parallel_hero_override_for_style(
     floor_index: int,
     floor_count: int,
 ) -> dict[str, Any] | None:
-    if tower_style(brief) != "traditional":
+    if tower_style(brief) == "traditional":
+        return parallel_projected_hero_before_floor(brief, floor_index, floor_count)
+    projection = project_hero_bands_by_floor(brief, floor_count)
+    if not 0 <= floor_index < len(projection):
         return None
-    return parallel_projected_hero_before_floor(brief, floor_index, floor_count)
+    hero = core_clone(projection[floor_index]["target"])
+    hero["method"] = "parallel red-sea estimate from the confirmed full prior-floor resource budget"
+    return hero
 
 
 def build_runtime_floor_policy(
@@ -7079,11 +7588,12 @@ def generate_floor_staged_with_retries(
 ) -> dict[str, Any]:
     topology_output: dict[str, Any] | None = None
     economy_output: dict[str, Any] | None = None
-    monster_output: dict[str, Any] | None = None
+    encounter_output: dict[str, Any] | None = None
     feedback: dict[str, Any] | None = None
     feedback_attempt: int | None = None
     repair_stage = "topology"
     repair_stage_outputs: dict[str, dict[str, Any]] = {}
+    complete_candidates: list[dict[str, Any]] = []
     floor_cache_key = floor_generation_cache_key(
         args,
         brief,
@@ -7112,12 +7622,12 @@ def generate_floor_staged_with_retries(
         if stage_start <= STAGE_ORDER["topology"]:
             topology_output = None
             economy_output = None
-            monster_output = None
+            encounter_output = None
         elif stage_start <= STAGE_ORDER["economy"]:
             economy_output = None
-            monster_output = None
+            encounter_output = None
         else:
-            monster_output = None
+            encounter_output = None
 
         if stage_start <= STAGE_ORDER["topology"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_topology"
@@ -7163,7 +7673,7 @@ def generate_floor_staged_with_retries(
                 source_path=stage_prefix.with_suffix(".floor.json"),
             )
             if final_attempt:
-                topology_review = forced_accept_review(floor_index, attempt, "topology")
+                topology_review = deferred_final_stage_review(floor_index, attempt, "topology")
             else:
                 try:
                     topology_review = run_staged_review(
@@ -7262,7 +7772,7 @@ def generate_floor_staged_with_retries(
                 source_path=stage_prefix.with_suffix(".floor.json"),
             )
             if final_attempt:
-                economy_review = forced_accept_review(floor_index, attempt, "economy")
+                economy_review = deferred_final_stage_review(floor_index, attempt, "economy")
             else:
                 try:
                     economy_review = run_staged_review(
@@ -7317,12 +7827,12 @@ def generate_floor_staged_with_retries(
         if economy_output is None:
             raise PipelineError(f"MT{floor_index} staged pipeline missing economy output.")
 
-        if stage_start <= STAGE_ORDER["monster"]:
-            stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_monster"
+        if stage_start <= STAGE_ORDER["encounter"]:
+            stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_encounter"
             try:
-                monster_output = agent_exec(
+                encounter_output = agent_exec(
                     args,
-                    build_monster_special_prompt(
+                    build_encounter_prompt(
                         args,
                         brief,
                         floor_index,
@@ -7331,125 +7841,96 @@ def generate_floor_staged_with_retries(
                         limits,
                         accepted_summaries,
                         economy_output,
-                        feedback if active_repair_stage == "monster" else None,
+                        feedback if active_repair_stage == "encounter" else None,
                         floor_policy,
                         floor_contract,
-                        repair_stage_outputs.get("monster")
-                        if feedback is not None and active_repair_stage == "monster"
+                        repair_stage_outputs.get("encounter")
+                        if feedback is not None and active_repair_stage == "encounter"
                         else None,
                     ),
                     STAGED_FLOOR_SCHEMA,
                     stage_prefix.with_suffix(".floor.json"),
                 )
             except Exception as exc:  # noqa: BLE001 - retry the staged floor on agent/reviewer errors.
-                write_stage_exception_or_raise(stage_prefix, floor_index, attempt, args.max_attempts, "monster", exc)
-                retry_stage = retry_stage_after_exception("monster")
+                write_stage_exception_or_raise(stage_prefix, floor_index, attempt, args.max_attempts, "encounter", exc)
+                retry_stage = retry_stage_after_exception("encounter")
                 feedback = feedback_after_exception(
                     feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
                 )
                 if feedback is None:
                     repair_stage_outputs.clear()
                 repair_stage = retry_stage
-                print(stage_exception_retry_message(floor_index, "monster", attempt, args.max_attempts, exc))
+                print(stage_exception_retry_message(floor_index, "encounter", attempt, args.max_attempts, exc))
                 continue
-            apply_brief_required_events(brief, monster_output)
-            write_json(stage_prefix.with_suffix(".floor.json"), monster_output)
+            apply_brief_required_events(brief, encounter_output)
+            write_json(stage_prefix.with_suffix(".floor.json"), encounter_output)
             write_floor_checkpoint(
                 args,
                 floor_index,
                 attempt,
-                "monster",
-                monster_output,
+                "encounter",
+                encounter_output,
                 source_path=stage_prefix.with_suffix(".floor.json"),
             )
-            if final_attempt:
-                monster_review = forced_accept_review(floor_index, attempt, "monster")
-            else:
-                try:
-                    monster_review = run_staged_review(
-                        args,
-                        stage_prefix,
-                        "monster",
-                        brief,
-                        monster_output,
-                        used,
-                        limits,
-                        accepted_summaries,
-                        accepted_floors,
-                        floor_size,
-                        maps,
-                        enemys,
-                        floor_policy,
-                        floor_contract,
-                        enforce_resource_progression,
-                        topology_output=topology_output,
-                        economy_output=economy_output,
-                    )
-                except Exception as exc:  # noqa: BLE001 - continue with attempt+1 when reviewer fails.
-                    write_stage_exception_or_raise(
-                        stage_prefix, floor_index, attempt, args.max_attempts, "monster", exc
-                    )
-                    retry_stage = retry_stage_after_exception("monster")
-                    feedback = feedback_after_exception(
-                        feedback, feedback_attempt, attempt, active_repair_stage, retry_stage
-                    )
-                    if feedback is None:
-                        repair_stage_outputs.clear()
-                    repair_stage = retry_stage
-                    print(stage_exception_retry_message(floor_index, "monster", attempt, args.max_attempts, exc))
-                    continue
-            write_json(stage_prefix.with_suffix(".review.json"), monster_review)
-            write_floor_checkpoint(
-                args,
-                floor_index,
-                attempt,
-                "monster",
-                monster_output,
-                monster_review,
-                stage_prefix.with_suffix(".floor.json"),
-            )
-            if not final_attempt and monster_review.get("status") != "pass":
-                feedback = monster_review
-                feedback_attempt = attempt
-                repair_stage_outputs["monster"] = monster_output
-                repair_stage = earliest_repair_stage(monster_review, "monster")
-                print(review_retry_message(floor_index, "monster", attempt, monster_review.get("summary", "")))
-                continue
-
-        if monster_output is None:
-            raise PipelineError(f"MT{floor_index} staged pipeline missing monster output.")
+        if encounter_output is None:
+            raise PipelineError(f"MT{floor_index} staged pipeline missing encounter output.")
 
         integration_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_integration"
         try:
             if final_attempt:
-                expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
-                try:
-                    forced_issues, forced_delta = local_floor_review(
-                        monster_output,
-                        expected_floor_id,
-                        floor_size,
-                        brief,
-                        maps,
-                        enemys,
-                        floor_policy,
-                    )
-                except PipelineError as exc:
-                    forced_issues = [str(exc)]
-                    forced_delta = normalize_delta(None)
-                integration_review = forced_accept_review(
-                    floor_index,
-                    attempt,
+                final_candidate_review = run_staged_review(
+                    args,
+                    integration_prefix,
                     "integration",
-                    forced_delta,
-                    forced_issues,
+                    brief,
+                    encounter_output,
+                    used,
+                    limits,
+                    accepted_summaries,
+                    accepted_floors,
+                    floor_size,
+                    maps,
+                    enemys,
+                    floor_policy,
+                    floor_contract,
+                    enforce_resource_progression,
+                    topology_output=topology_output,
+                    economy_output=economy_output,
+                    run_llm_review=False,
                 )
+                complete_candidates.append(
+                    complete_floor_candidate(
+                        floor_index,
+                        attempt,
+                        topology_output,
+                        economy_output,
+                        encounter_output,
+                        final_candidate_review,
+                        "final",
+                        maps,
+                    )
+                )
+                write_complete_candidate_archive(args, floor_index, complete_candidates)
+                selected_candidate, integration_review = select_final_floor_candidate(
+                    args,
+                    brief,
+                    floor_index,
+                    complete_candidates,
+                    used,
+                    limits,
+                    floor_policy,
+                    floor_contract,
+                )
+                topology_output = core_clone(selected_candidate["topology_output"])
+                economy_output = core_clone(selected_candidate["economy_output"])
+                encounter_output = core_clone(selected_candidate["encounter_output"])
             else:
                 integration_review = run_staged_review(
                     args,
                     integration_prefix,
                     "integration",
                     brief,
-                    monster_output,
+                    encounter_output,
                     used,
                     limits,
                     accepted_summaries,
@@ -7463,7 +7944,7 @@ def generate_floor_staged_with_retries(
                     topology_output=topology_output,
                     economy_output=economy_output,
                 )
-        except Exception as exc:  # noqa: BLE001 - integration reviewer has no generator, retry from monster.
+        except Exception as exc:  # noqa: BLE001 - final reviewer has no generator; retry from encounter.
             write_stage_exception_or_raise(
                 integration_prefix, floor_index, attempt, args.max_attempts, "integration", exc
             )
@@ -7491,30 +7972,48 @@ def generate_floor_staged_with_retries(
             floor_index,
             attempt,
             "integration",
-            monster_output,
+            encounter_output,
             integration_review,
             integration_prefix.with_suffix(".review.json"),
         )
         if integration_review.get("status") == "pass":
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.topology.json", topology_output)
             write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.economy.json", economy_output)
-            write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.monster.json", monster_output)
+            write_json(args.out_dir / "floors" / f"MT{floor_index}.staged.encounter.json", encounter_output)
             if is_forced_accept_review(integration_review):
                 print(f"{floor_label(floor_index)}已保存，但质量需要生成结束后手动看一下。")
+            elif integration_review.get("best_effort_selection"):
+                print(
+                    f"{floor_label(floor_index)}已由 reviewer 从 "
+                    f"{integration_review.get('candidate_count', 1)} 个完整候选中选定。"
+                )
             result = {
                 "floor_index": floor_index,
-                "floor_output": monster_output,
+                "floor_output": encounter_output,
                 "review": integration_review,
                 "budget_delta": normalize_delta(integration_review.get("budget_delta")),
             }
             write_cached_floor_result(args, floor_cache_key, result)
             return result
 
+        complete_candidates.append(
+            complete_floor_candidate(
+                floor_index,
+                attempt,
+                topology_output,
+                economy_output,
+                encounter_output,
+                integration_review,
+                "integration",
+                maps,
+            )
+        )
+        write_complete_candidate_archive(args, floor_index, complete_candidates)
         feedback = integration_review
         feedback_attempt = attempt
         repair_stage_outputs["topology"] = topology_output
         repair_stage_outputs["economy"] = economy_output
-        repair_stage_outputs["monster"] = monster_output
+        repair_stage_outputs["encounter"] = encounter_output
         repair_stage = earliest_repair_stage(integration_review, "integration")
         print(
             review_retry_message(
@@ -7723,17 +8222,17 @@ def recovery_floor_candidates(out_dir: Path, floor_index: int) -> list[tuple[tup
     latest = floors_dir / f"MT{floor_index}.latest.floor.json"
     if latest.exists():
         candidates.append(((9_500, 0, 0), latest))
-    latest_stage_priority = {"topology": 1, "economy": 2, "monster": 3, "integration": 4, "accepted": 5}
+    latest_stage_priority = {"topology": 1, "economy": 2, "encounter": 3, "integration": 4, "accepted": 5}
     for stage, priority in latest_stage_priority.items():
         path = floors_dir / f"MT{floor_index}.latest.{stage}.floor.json"
         if path.exists():
             candidates.append(((9_400, priority, 0), path))
-    for priority, stage in enumerate(("topology", "economy", "monster"), start=1):
+    for priority, stage in enumerate(("topology", "economy", "encounter"), start=1):
         path = floors_dir / f"MT{floor_index}.staged.{stage}.json"
         if path.exists():
             candidates.append(((9_000, priority, 0), path))
-    pattern = re.compile(rf"MT{floor_index}_attempt(\d+)_(topology|economy|monster)\.floor\.json$")
-    stage_priority = {"topology": 1, "economy": 2, "monster": 3}
+    pattern = re.compile(rf"MT{floor_index}_attempt(\d+)_(topology|economy|encounter)\.floor\.json$")
+    stage_priority = {"topology": 1, "economy": 2, "encounter": 3}
     for path in floors_dir.glob(f"MT{floor_index}_attempt*_*.floor.json"):
         match = pattern.match(path.name)
         if not match:
@@ -7854,6 +8353,8 @@ def run_sequential_floor_generation(
     accepted_summaries: list[dict[str, Any]],
     accepted_floors: list[dict[str, Any]],
 ) -> tuple[dict[str, int], list[dict[str, Any]], list[dict[str, Any]]]:
+    contracts = build_floor_contracts(args, brief, floor_count, floor_size, limits)
+    write_json(args.out_dir / "floor_contracts.json", {"contracts": contracts})
     for floor_index in range(start_floor_index, floor_count):
         floor_policy = build_runtime_floor_policy(brief, floor_enemy_policies, floor_index, accepted_floors, maps)
         try:
@@ -7870,6 +8371,7 @@ def run_sequential_floor_generation(
                 accepted_summaries,
                 accepted_floors,
                 floor_policy,
+                contracts[floor_index],
             )
         except Exception as exc:  # noqa: BLE001 - keep the tower build moving.
             print(f"{floor_label(floor_index)}生成过程出错，已保留可恢复楼层并继续：{exc}")
@@ -7893,6 +8395,9 @@ def run_sequential_floor_generation(
         if is_forced_accept_review(accepted_review):
             summary_extra["forced_accept"] = True
             summary_extra["quality_warning"] = accepted_review.get("summary", "")
+        elif accepted_review.get("best_effort_selection"):
+            summary_extra["best_effort_selection"] = True
+            summary_extra["selected_candidate_id"] = accepted_review.get("selected_candidate_id")
         accepted_summaries.append(
             accepted_floor_summary(args, floor_index, floor_size, accepted_floor, delta, summary_extra)
         )
@@ -7916,6 +8421,8 @@ def run_sequential_floor_generation(
                     print(f"MT{floor_index} playtest failed under --playtest-policy=fail; output is kept.")
         if is_forced_accept_review(accepted_review):
             print(f"{floor_label(floor_index)}已保存，但建议生成结束后手动微调。")
+        elif accepted_review.get("best_effort_selection"):
+            print(f"{floor_label(floor_index)}已保存 reviewer 选定的最佳完整候选。")
         else:
             print(f"{floor_label(floor_index)}检查通过。")
 
@@ -8001,6 +8508,8 @@ def run_parallel_floor_generation(
                 print(f"{floor_label(floor_index)}并发生成出错，已恢复中间产物并继续：{exc}")
             if is_forced_accept_review(results[floor_index].get("review")):
                 print(f"{floor_label(floor_index)}已保存，但质量需要生成结束后手动看一下。")
+            elif results[floor_index].get("review", {}).get("best_effort_selection"):
+                print(f"{floor_label(floor_index)}已由 reviewer 从完整候选中选定。")
             else:
                 print(f"{floor_label(floor_index)}检查通过。")
 
@@ -8088,7 +8597,14 @@ def run_parallel_floor_generation(
                             "quality_warning": accepted_review.get("summary", ""),
                         }
                         if forced_accept
-                        else {}
+                        else (
+                            {
+                                "best_effort_selection": True,
+                                "selected_candidate_id": accepted_review.get("selected_candidate_id"),
+                            }
+                            if accepted_review.get("best_effort_selection")
+                            else {}
+                        )
                     ),
                 },
             )
@@ -8448,21 +8964,32 @@ def self_test(repo_root: Path) -> int:
     assert normalize_tower_style(None) == "traditional"
     assert infer_tower_style_from_idea("生成一座红海塔") == "red_sea"
     assert infer_tower_style_from_idea("生成一座传统塔") == "traditional"
+    assert style_skill_name("traditional", "brief") == "design-traditional-mota-tower"
+    assert style_skill_name("traditional", "topology") == "topology-mota-floor"
+    assert style_skill_name("traditional", "economy") == "economy-mota-floor"
+    assert style_skill_name("traditional", "encounter") == "encounter-mota-floor"
+    assert style_skill_name("traditional", "review") == "review-mota-floor"
+    assert style_skill_name("red_sea", "brief") == "design-red-sea-mota-tower"
+    assert style_skill_name("red_sea", "topology") == "topology-red-sea-mota-floor"
+    assert style_skill_name("red_sea", "economy") == "economy-red-sea-mota-floor"
+    assert style_skill_name("red_sea", "encounter") == "encounter-red-sea-mota-floor"
+    assert style_skill_name("red_sea", "review") == "review-red-sea-mota-floor"
     assert opportunity_range({"tower_style": "traditional"}) == (6, 20)
-    assert opportunity_range({"tower_style": "red_sea"}) == (10, 40)
+    assert opportunity_range({"tower_style": "red_sea"}) == (16, 40)
     assert route_family_range({"tower_style": "traditional"}) == (2, 4)
+    assert route_family_range({"tower_style": "red_sea"}) == (4, 5)
     assert wall_ratio_range({"tower_style": "traditional"}) == (0.35, 0.45)
-    assert wall_ratio_range({"tower_style": "red_sea"}) == (0.45, 0.55)
+    assert wall_ratio_range({"tower_style": "red_sea"}) == (0.40, 0.52)
     assert monster_policy_int({"tower_style": "traditional"}, "enemy_count_min_per_floor") == 18
     assert monster_policy_int({"tower_style": "traditional"}, "enemy_count_max_per_floor") == 28
-    assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_min_per_floor") == 22
-    assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_max_per_floor") == 33
+    assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_min_per_floor") == 24
+    assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_max_per_floor") == 32
     assert DEFAULT_MONSTER_TYPES_PER_FLOOR == 9
     style_probe_args = argparse.Namespace(tower_style="red_sea", wall_ratio_min=None, wall_ratio_max=None)
     style_probe_brief = {"global_settings": {"initial_hero": {"tools": {"book": 0}}}}
     apply_tower_style(style_probe_args, style_probe_brief)
     assert style_probe_brief["global_settings"]["initial_hero"]["tools"]["book"] == 1
-    assert (style_probe_args.wall_ratio_min, style_probe_args.wall_ratio_max) == (0.45, 0.55)
+    assert (style_probe_args.wall_ratio_min, style_probe_args.wall_ratio_max) == (0.40, 0.52)
     few_shot_fixture = {
         "fingerprint": "fixture",
         "floors": [
@@ -8534,7 +9061,7 @@ def self_test(repo_root: Path) -> int:
                 if test_style == "traditional"
                 else "mota-few-shot-selection-v3-style-split"
             )
-            for test_stage in ("topology", "economy", "monster", "integration"):
+            for test_stage in ("topology", "economy", "encounter", "integration"):
                 for test_floor_index in range(3):
                     selection = first_plan["stages"][test_stage][str(test_floor_index)]
                     shared = set(selection["shared"])
@@ -8677,11 +9204,12 @@ def self_test(repo_root: Path) -> int:
             11,
             contract_limits,
         )
-    assert [item["resource_limits"]["yellow_doors"] for item in fallback_contracts] == [2, 2, 1]
-    assert [item["resource_limits"]["blue_doors"] for item in fallback_contracts] == [1, 0, 0]
+    assert [item["resource_limits"]["yellow_doors"] for item in fallback_contracts] == [1, 2, 2]
+    assert [item["resource_limits"]["blue_doors"] for item in fallback_contracts] == [0, 0, 1]
     assert all(item["budget_source"] == "integer_fallback" for item in fallback_contracts)
     assert "resource_budget.yellow_doors sums to 4" in fallback_log.getvalue()
     assert "falling back to integer distribution" in fallback_log.getvalue()
+    assert [distribute_red_sea_limit("redGems", 42, 6, index) for index in range(6)] == [6, 6, 7, 7, 8, 8]
     codex_args = argparse.Namespace(
         codex_bin="codex",
         model=DEFAULT_CODEX_MODEL,
@@ -8893,6 +9421,10 @@ def self_test(repo_root: Path) -> int:
     topology_capacity = topology_capacity_metrics(topology_floor_output, maps, sample_brief)
     assert topology_capacity["nonadjacent_enemy_capacity_lower_bound"] >= 4
     assert "validated_opportunity_count" in topology_capacity
+    density_fragmentation = spatial_density_and_fragmentation_metrics(topology_floor_output, maps)
+    assert density_fragmentation["available"] is True
+    assert len(density_fragmentation["zones"]) == 9
+    assert 0 <= density_fragmentation["fragmentation_score"] <= 4
     duplicate_wall_issues = wall_mask_similarity_issues([topology_floor_output], core_clone(topology_floor_output), maps)
     assert any("Adjacent wall mask similarity" in issue for issue in duplicate_wall_issues)
 
@@ -8936,19 +9468,19 @@ def self_test(repo_root: Path) -> int:
             "kind": "combat_chokepoint",
             "label": "center guard",
             "coordinates": [[4, 3], [1, 5]],
-            "description": "monster stage should place route pressure here",
+            "description": "encounter stage should place route pressure here",
             "tags": ["combat"],
             "data": "",
         }
     ]
     economy_floor_output["floor"]["map"] = [
         [1, 1, 1, 1, 87, 1, 1, 1, 1],
-        [1, 0, 1, 0, 81, 0, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 27, 1],
+        [1, 0, 1, 0, 1, 0, 1, 1, 1],
+        [1, 22, 1, 0, 0, 0, 1, 28, 1],
         [1, 0, 1, 0, 1, 0, 1, 0, 1],
-        [1, 22, 1, 0, 0, 0, 1, 0, 1],
-        [1, 0, 1, 0, 1, 0, 1, 0, 1],
-        [1, 0, 1, 0, 1, 0, 1, 0, 1],
-        [1, 21, 1, 0, 82, 0, 1, 0, 1],
+        [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 21, 1, 0, 0, 0, 1, 32, 1],
         [1, 88, 0, 0, 1, 0, 0, 0, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1],
     ]
@@ -8965,13 +9497,28 @@ def self_test(repo_root: Path) -> int:
         False,
     )
     assert not any(issue["severity"] == "fail" for issue in economy_issues)
-    assert economy_delta["yellow_doors"] == 1
-    assert economy_delta["blue_doors"] == 1
+    assert economy_delta["yellow_doors"] == 0
+    assert economy_delta["blue_doors"] == 0
+    economy_with_door = core_clone(economy_floor_output)
+    economy_with_door["floor"]["map"][1][4] = 81
+    door_issues, _ = economy_stage_review_issues(
+        economy_with_door,
+        "MT0",
+        9,
+        sample_brief,
+        maps,
+        {key: None for key in TRACKED_RESOURCES},
+        empty_budget(),
+        [],
+        None,
+        False,
+    )
+    assert any("economy stage must not place doors" in issue["reason"] for issue in door_issues)
 
     monster_floor_output = core_clone(sample_floor_output)
     monster_floor_output["annotations"] = [
         {
-            "stage": "monster",
+            "stage": "encounter",
             "kind": "combat_role",
             "label": "self-test roles",
             "coordinates": [[2, 1], [6, 1], [4, 3], [2, 5], [6, 5]],
@@ -8991,7 +9538,7 @@ def self_test(repo_root: Path) -> int:
         [1, 88, 0, 0, 1, 0, 0, 0, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1],
     ]
-    monster_issues, monster_delta, monster_metrics = monster_stage_review_issues(
+    encounter_issues, encounter_delta, encounter_metrics = integration_stage_review_issues(
         monster_floor_output,
         "MT0",
         9,
@@ -9002,12 +9549,35 @@ def self_test(repo_root: Path) -> int:
         empty_budget(),
         [],
         None,
+        {"resource_limits": {"yellow_doors": 1, "blue_doors": 1}},
+        economy_floor_output,
         False,
     )
-    assert not any(issue["severity"] == "fail" for issue in monster_issues)
+    assert not any(issue["severity"] == "fail" for issue in encounter_issues), encounter_issues
     for key in ("yellow_doors", "blue_doors", "yellow_keys", "blue_keys"):
-        assert monster_delta[key] == sample_delta[key]
-    assert monster_metrics["available"] is True
+        assert encounter_delta[key] == sample_delta[key]
+    assert encounter_metrics["available"] is True
+    moved_resource = core_clone(monster_floor_output)
+    moved_resource["floor"]["map"][1][7] = 0
+    assert encounter_preservation_issues(economy_floor_output, moved_resource, maps)
+    wrong_door_quota = core_clone(monster_floor_output)
+    wrong_door_quota["floor"]["map"][6][4] = 0
+    quota_issues, _, _ = integration_stage_review_issues(
+        wrong_door_quota,
+        "MT0",
+        9,
+        sample_brief,
+        maps,
+        enemys,
+        {key: None for key in TRACKED_RESOURCES},
+        empty_budget(),
+        [],
+        None,
+        {"resource_limits": {"yellow_doors": 1, "blue_doors": 1}},
+        economy_floor_output,
+        False,
+    )
+    assert any(issue["owner_stage"] == "encounter" and "blue_doors exact floor quota" in issue["reason"] for issue in quota_issues)
 
     original_agent_exec = globals()["agent_exec"]
     with tempfile.TemporaryDirectory() as forced_tmp:
@@ -9018,6 +9588,9 @@ def self_test(repo_root: Path) -> int:
             floor_number_offset=0,
             max_attempts=1,
             no_generation_cache=True,
+            max_wall_similarity=MAX_ADJACENT_WALL_MASK_SIMILARITY,
+            wall_ratio_min=DEFAULT_WALL_RATIO_MIN,
+            wall_ratio_max=DEFAULT_WALL_RATIO_MAX,
         )
         fake_stage_outputs = [
             core_clone(topology_floor_output),
@@ -9035,6 +9608,11 @@ def self_test(repo_root: Path) -> int:
             if schema is STRUCTURED_REVIEW_SCHEMA:
                 raise AssertionError("final attempt must not call LLM review")
             fake_calls.append(output_path.name)
+            if schema is FINAL_CANDIDATE_SELECTION_SCHEMA:
+                return {
+                    "selected_candidate_id": "MT0-attempt1",
+                    "summary": "Selected the only complete candidate.",
+                }
             return fake_stage_outputs.pop(0)
 
         globals()["agent_exec"] = fake_agent_exec
@@ -9057,8 +9635,97 @@ def self_test(repo_root: Path) -> int:
             )
         finally:
             globals()["agent_exec"] = original_agent_exec
-        assert is_forced_accept_review(forced_result["review"])
-        assert len(fake_calls) == 3
+        assert not is_forced_accept_review(forced_result["review"])
+        assert forced_result["review"]["best_effort_selection"] is True
+        assert forced_result["review"]["selected_candidate_id"] == "MT0-attempt1"
+        assert len(fake_calls) == 4
+        archived_candidates = json.loads(
+            (Path(forced_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
+        )
+        assert archived_candidates[0]["candidate_id"] == "MT0-attempt1"
+
+    with tempfile.TemporaryDirectory() as selection_tmp:
+        selection_args = argparse.Namespace(
+            repo_root=repo_root,
+            out_dir=Path(selection_tmp),
+            floor_prefix="MT",
+            floor_number_offset=0,
+            max_attempts=2,
+            no_generation_cache=True,
+            max_wall_similarity=MAX_ADJACENT_WALL_MASK_SIMILARITY,
+            wall_ratio_min=DEFAULT_WALL_RATIO_MIN,
+            wall_ratio_max=DEFAULT_WALL_RATIO_MAX,
+        )
+        earlier_candidate = core_clone(monster_floor_output)
+        earlier_candidate["summary"] = "earlier complete candidate"
+        final_candidate = core_clone(monster_floor_output)
+        final_candidate["summary"] = "final complete candidate"
+        selection_stage_outputs = [
+            core_clone(topology_floor_output),
+            core_clone(economy_floor_output),
+            earlier_candidate,
+            final_candidate,
+        ]
+
+        def selection_agent_exec(
+            _args: argparse.Namespace,
+            _prompt: str,
+            schema: dict[str, Any],
+            output_path: Path,
+        ) -> dict[str, Any]:
+            if schema is FINAL_CANDIDATE_SELECTION_SCHEMA:
+                return {
+                    "selected_candidate_id": "MT0-attempt1",
+                    "summary": "The earlier complete candidate is better overall.",
+                }
+            if schema is STRUCTURED_REVIEW_SCHEMA:
+                if "integration" in output_path.name:
+                    return structured_review(
+                        "integration",
+                        [
+                            structured_issue(
+                                "encounter",
+                                "fail",
+                                "Simulated integration rejection.",
+                                "Adjust monster pressure.",
+                                repair_stage="encounter",
+                            )
+                        ],
+                        empty_budget(),
+                        "Simulated integration rejection.",
+                    )
+                return structured_review("topology", [], empty_budget(), "LLM review passed.")
+            return selection_stage_outputs.pop(0)
+
+        globals()["agent_exec"] = selection_agent_exec
+        try:
+            selection_result = generate_floor_staged_with_retries(
+                selection_args,
+                sample_brief,
+                0,
+                1,
+                9,
+                maps,
+                enemys,
+                empty_budget(),
+                {key: None for key in TRACKED_RESOURCES},
+                [],
+                [],
+                {},
+                None,
+                False,
+            )
+        finally:
+            globals()["agent_exec"] = original_agent_exec
+        assert selection_result["floor_output"]["summary"] == "earlier complete candidate"
+        assert selection_result["review"]["selected_candidate_id"] == "MT0-attempt1"
+        archived_candidates = json.loads(
+            (Path(selection_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
+        )
+        assert [item["candidate_id"] for item in archived_candidates] == [
+            "MT0-attempt1",
+            "MT0-attempt2",
+        ]
 
     with tempfile.TemporaryDirectory() as retry_tmp:
         retry_args = argparse.Namespace(
@@ -9123,7 +9790,8 @@ def self_test(repo_root: Path) -> int:
         assert "MT0_attempt2_topology.floor.json" in retry_calls
         assert "MT0_attempt2_topology.review.topology.json" in retry_calls
         assert "MT0_attempt2_economy.review.economy.json" in retry_calls
-        assert "MT0_attempt2_monster.review.monster.json" in retry_calls
+        assert "MT0_attempt2_encounter.floor.json" in retry_calls
+        assert "MT0_attempt2_encounter.review.json" not in retry_calls
         assert "MT0_attempt2_integration.review.integration.json" in retry_calls
         assert "simulated topology generator failure" not in retry_prompts["MT0_attempt2_topology.floor.json"]
         assert '"repair_feedback":{}' in retry_prompts["MT0_attempt2_topology.floor.json"]
@@ -9142,11 +9810,6 @@ def self_test(repo_root: Path) -> int:
         assert economy_review_input["upstream_stage_maps"]["topology"]["annotations"] == topology_floor_output["annotations"]
         assert "events" not in economy_review_input["upstream_stage_maps"]["topology"]
 
-        monster_review_input = review_input_payload("MT0_attempt2_monster.review.monster.json")
-        assert set(monster_review_input["upstream_stage_maps"]) == {"topology", "economy"}
-        assert monster_review_input["upstream_stage_maps"]["economy"]["map"] == economy_floor_output["floor"]["map"]
-        assert monster_review_input["upstream_stage_maps"]["economy"]["annotations"] == economy_floor_output["annotations"]
-
         integration_review_input = review_input_payload("MT0_attempt2_integration.review.integration.json")
         assert set(integration_review_input["upstream_stage_maps"]) == {"topology", "economy"}
         assert integration_review_input["upstream_stage_maps"]["topology"]["map"] == topology_floor_output["floor"]["map"]
@@ -9160,7 +9823,7 @@ def self_test(repo_root: Path) -> int:
     )
     assert feedback_after_exception(previous_feedback, 1, 2, "topology", "topology") is previous_feedback
     assert feedback_after_exception(previous_feedback, 1, 3, "topology", "topology") is None
-    assert feedback_after_exception(previous_feedback, 1, 2, "economy", "monster") is None
+    assert feedback_after_exception(previous_feedback, 1, 2, "economy", "encounter") is None
 
     integration_review = structured_review(
         "integration",
@@ -9177,7 +9840,7 @@ def self_test(repo_root: Path) -> int:
     )
     assert earliest_repair_stage(integration_review, "integration") == "economy"
     assert integration_review["issues"][0]["repair_stage"] == "economy"
-    assert classify_issue_owner("Entrance free region exposes too many resources", "monster") == "economy"
+    assert classify_issue_owner("Entrance free region exposes too many resources", "encounter") == "economy"
     topology_review = structured_review(
         "topology",
         [structured_issue("topology", "fail", "route graph is a single corridor", "Create the style-required candidate route families.")],
@@ -9217,7 +9880,7 @@ def self_test(repo_root: Path) -> int:
         "monster_policy": {"allowed_specials": [1, 2, 3, 15, 16, 18], "monster_types_per_floor": 9},
     }
     local_issues, _ = local_floor_review(sample_floor_output, "MT0", 9, red_sea_density_brief, maps, enemys)
-    assert any("at least 22 enemies" in issue for issue in local_issues)
+    assert any("at least 24 enemies" in issue for issue in local_issues)
     over_max_brief = {
         "monster_policy": {
             "allowed_specials": [1, 2, 3, 15, 16, 18],
@@ -9255,6 +9918,29 @@ def self_test(repo_root: Path) -> int:
     hero_projection = project_hero_bands_by_floor(projection_brief, 3)
     assert hero_projection[2]["target"]["atk"] > hero_projection[0]["target"]["atk"]
     assert hero_projection[2]["target"]["hp"] > hero_projection[0]["target"]["hp"]
+    red_sea_projection_brief = core_clone(projection_brief)
+    red_sea_projection_brief["tower_style"] = "red_sea"
+    red_sea_projection_brief["floor_progression_plan"] = [
+        {"floor_index": 0, "resource_budget": {"redGems": 2, "blueGems": 2}},
+        {"floor_index": 1, "resource_budget": {"redGems": 4, "blueGems": 4}},
+        {"floor_index": 2, "resource_budget": {"redGems": 6, "blueGems": 6}},
+    ]
+    red_sea_projection = project_hero_bands_by_floor(red_sea_projection_brief, 3)
+    assert red_sea_projection[1]["target"]["atk"] == 12
+    assert red_sea_projection[2]["target"]["atk"] == 16
+    assert red_sea_projection[2]["target"] == red_sea_projection[2]["completion"]
+    red_sea_pool_brief = core_clone(red_sea_projection_brief)
+    red_sea_pool_brief.setdefault("monster_policy", {})["floor_overlap_ratio"] = 0.7
+    red_sea_policies = build_floor_enemy_policies(3, maps, enemys, red_sea_pool_brief)
+    for policy in red_sea_policies[1:]:
+        minimum = float(policy["carry_min_difficulty"])
+        for enemy_id in policy["carried_enemy_ids"]:
+            assert float(policy["enemy_combat_metrics"][enemy_id]["difficulty_score"]) >= minimum
+    for policy in red_sea_policies:
+        debut_minimum = float(policy["debut_min_atk_def_sum"])
+        for enemy_id in policy["debut_enemy_ids"]:
+            enemy = enemys[enemy_id]
+            assert policy_number(enemy.get("atk"), 0.0) + policy_number(enemy.get("def"), 0.0) >= debut_minimum
     parallel_projection_brief = core_clone(projection_brief)
     parallel_projection_brief["global_settings"]["initial_hero"] = {
         "hp": 300,
@@ -9275,7 +9961,10 @@ def self_test(repo_root: Path) -> int:
     assert parallel_hero_override_for_style(parallel_projection_brief, 1, 4) == parallel_floor_1
     red_sea_parallel_brief = core_clone(parallel_projection_brief)
     red_sea_parallel_brief["tower_style"] = "red_sea"
-    assert parallel_hero_override_for_style(red_sea_parallel_brief, 1, 4) is None
+    red_sea_parallel_hero = parallel_hero_override_for_style(red_sea_parallel_brief, 1, 4)
+    assert red_sea_parallel_hero is not None
+    assert red_sea_parallel_hero["atk"] == 15.25
+    assert red_sea_parallel_hero["def"] == 15.25
     enemy_table_review = local_enemy_table_review(floor_policies, enemys, sample_brief)
     assert enemy_table_review["status"] in {"pass", "fail"}
     assert len(enemy_table_review["floor_summaries"]) == 3
@@ -9319,15 +10008,49 @@ def self_test(repo_root: Path) -> int:
     dominated_enemys = core_clone(tradeoff_enemys)
     dominated_enemys["balanced"].update({"hp": 350, "atk": 45, "def": 20})
     dominated_review = local_enemy_table_review([tradeoff_policy], dominated_enemys, tradeoff_brief)
-    assert any("strict dominance" in issue["reason"] for issue in dominated_review["issues"])
+    assert dominated_review["status"] == "pass"
     red_sea_low_tax_policy = core_clone(tradeoff_policy)
     red_sea_low_tax_policy["enemy_combat_metrics"]["tank"]["difficulty_score"] = 0.2
+    red_sea_low_tax_policy["estimated_hero_bands"]["target"] = {"hp": 1000, "atk": 10, "def": 10}
     red_sea_low_tax_review = local_enemy_table_review(
         [red_sea_low_tax_policy],
         tradeoff_enemys,
         {"tower_style": "red_sea", "monster_policy": {"allowed_specials": [2, 15], "monster_types_per_floor": 5}},
     )
-    assert any("allows at most 0" in issue["reason"] for issue in red_sea_low_tax_review["issues"])
+    assert red_sea_low_tax_review["status"] == "pass"
+    red_sea_reuse_policy = core_clone(red_sea_low_tax_policy)
+    red_sea_reuse_policy["floor_index"] = 1
+    red_sea_reuse_policy["estimated_hero_bands"]["target"] = {"hp": 1000, "atk": 50, "def": 50}
+    assert local_enemy_table_review(
+        [red_sea_low_tax_policy, red_sea_reuse_policy],
+        tradeoff_enemys,
+        {"tower_style": "red_sea", "monster_policy": {"monster_types_per_floor": 5}},
+    )["status"] == "pass"
+    late_weak_enemys = core_clone(tradeoff_enemys)
+    late_weak_enemys["lateWeak"] = {"hp": 120, "atk": 8, "def": 7, "special": 0}
+    late_weak_policy = core_clone(red_sea_reuse_policy)
+    late_weak_policy["allowed_enemy_ids"].append("lateWeak")
+    late_weak_policy["enemy_combat_metrics"]["lateWeak"] = {
+        "killable": True,
+        "difficulty_score": 1.0,
+        "rounds": 3,
+    }
+    late_weak_policy["enemy_role_hints"]["lateWeak"] = "balanced"
+    late_weak_policy["enemy_role_families"]["lateWeak"] = "balanced"
+    late_weak_policy["enemy_raw_strength"]["lateWeak"] = 50
+    late_weak_review = local_enemy_table_review(
+        [red_sea_low_tax_policy, late_weak_policy],
+        late_weak_enemys,
+        {"tower_style": "red_sea", "monster_policy": {"monster_types_per_floor": 6}},
+    )
+    assert any("debut enemies" in issue["reason"] for issue in late_weak_review["issues"])
+    unkillable_policy = core_clone(tradeoff_policy)
+    unkillable_policy["enemy_combat_metrics"]["zone"] = {
+        "killable": False,
+        "difficulty_score": 999.0,
+        "rounds": None,
+    }
+    assert local_enemy_table_review([unkillable_policy], tradeoff_enemys, tradeoff_brief)["status"] == "pass"
     merged_enemy_review = merge_enemy_table_reviews(
         {"status": "pass", "issues": [], "floor_summaries": [], "summary": "local pass"},
         {
@@ -9345,6 +10068,24 @@ def self_test(repo_root: Path) -> int:
         },
     )
     assert merged_enemy_review["status"] == "fail"
+    warning_free_review = merge_enemy_table_reviews(
+        {"status": "pass", "issues": [], "floor_summaries": [], "summary": "local pass"},
+        {
+            "status": "pass",
+            "issues": [
+                {
+                    "severity": "warn",
+                    "floor_indices": [0],
+                    "enemy_ids": [],
+                    "reason": "remove me",
+                    "required_change": "none",
+                }
+            ],
+            "summary": "reviewer warning",
+        },
+    )
+    assert warning_free_review["status"] == "pass"
+    assert warning_free_review["issues"] == []
     disallowed_policy = core_clone(floor_policies[0])
     disallowed_policy["allowed_enemy_ids"] = ["greenSlime"]
     disallowed_policy["allowed_enemy_codes"] = [201]
@@ -9555,12 +10296,17 @@ def self_test(repo_root: Path) -> int:
     for name in [
         "build-mota-tower",
         "design-traditional-mota-tower",
+        "design-red-sea-mota-tower",
         "review-mota-enemy-table",
         "review-mota-floor",
+        "review-red-sea-mota-floor",
         "playtest-mota-game",
         "topology-mota-floor",
+        "topology-red-sea-mota-floor",
         "economy-mota-floor",
-        "monster-special-mota-floor",
+        "economy-red-sea-mota-floor",
+        "encounter-mota-floor",
+        "encounter-red-sea-mota-floor",
         "modify-mota-enemy-data",
     ]:
         path = skill_path(repo_root, name)

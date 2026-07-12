@@ -1,4 +1,0 @@
-interface:
-  display_name: "魔塔怪物特殊生成"
-  short_description: "Place allowed monsters and special pressure"
-  default_prompt: "Use $monster-special-mota-floor to replace combat annotations with concrete monsters and special pressure."

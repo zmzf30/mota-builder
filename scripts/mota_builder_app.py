@@ -59,7 +59,7 @@ TRACKED_RESOURCE_KEYS = (
 STAGE_LABELS = {
     "topology": "地图结构",
     "economy": "资源和路线",
-    "monster": "怪物和战斗",
+    "encounter": "门和战斗遭遇",
     "integration": "整体",
 }
 
@@ -89,8 +89,8 @@ def beginner_review_reason(summary: str) -> str:
         add("地图结构还不合适")
     if "local economy review failed" in lower:
         add("资源、钥匙门或路线取舍还不合适")
-    if "local monster review failed" in lower:
-        add("怪物和战斗压力还不合适")
+    if "local encounter review failed" in lower:
+        add("门和战斗遭遇还不合适")
     if "local integration review failed" in lower:
         add("整层地图还没有达到可保存标准")
     if "entrance" in lower and "exit" in lower and "reachable" in lower:
@@ -321,11 +321,11 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         tower_style = "traditional"
     style_wall_defaults = {
         "traditional": (0.35, 0.45),
-        "red_sea": (0.45, 0.55),
+        "red_sea": (0.40, 0.52),
     }
     style_enemy_defaults = {
         "traditional": (18, 28),
-        "red_sea": (22, 33),
+        "red_sea": (24, 32),
     }
     default_wall_min, default_wall_max = style_wall_defaults[tower_style]
     default_enemy_min, default_enemy_max = style_enemy_defaults[tower_style]
@@ -467,7 +467,7 @@ def default_resources(floors: int, tower_style: str = "traditional") -> dict[str
         pickaxes = floors
         bombs = floors
         center_fly = floors
-    return {
+    defaults = {
         "yellowDoors": floors * 4,
         "blueDoors": floors * 2,
         "yellowKeys": floors * 2,
@@ -484,6 +484,16 @@ def default_resources(floors: int, tower_style: str = "traditional") -> dict[str
         "yellowPotions": 0,
         "greenPotions": 0,
     }
+    if tower_style == "red_sea":
+        defaults.update(
+            {
+                "redGems": floors * 7,
+                "blueGems": floors * 7,
+                "redPotions": floors * 7,
+                "bluePotions": floors * 3,
+            }
+        )
+    return defaults
 
 
 def default_floor_progression_plan(
@@ -516,6 +526,49 @@ def default_floor_progression_plan(
     return plan
 
 
+def red_sea_floor_progression_plan(
+    global_limits: dict[str, int],
+    floors: int,
+) -> list[dict[str, Any]]:
+    floor_count = max(int(floors), 1)
+    per_resource: dict[str, list[int]] = {}
+    for key in TRACKED_RESOURCE_KEYS:
+        total = max(int(global_limits.get(key, 0)), 0)
+        if key in {"redGems", "blueGems", "redPotions"} and total == floor_count * 7:
+            if floor_count <= 2:
+                per_resource[key] = [7] * floor_count
+            else:
+                low_count = max(1, floor_count // 3)
+                high_count = low_count
+                middle_count = floor_count - low_count - high_count
+                per_resource[key] = [6] * low_count + [7] * middle_count + [8] * high_count
+        else:
+            base, remainder = divmod(total, floor_count)
+            per_resource[key] = [base] * (floor_count - remainder) + [base + 1] * remainder
+
+    plan: list[dict[str, Any]] = []
+    for floor_index in range(floor_count):
+        role = "入口层" if floor_index == 0 else "最终层" if floor_index == floor_count - 1 else "中间层"
+        plan.append(
+            {
+                "floor_index": floor_index,
+                "role": role,
+                "resource_budget": {
+                    key: per_resource[key][floor_index]
+                    for key in TRACKED_RESOURCE_KEYS
+                },
+                "route_archetypes": ["碎片化主通路", "局部门钥匙承诺", "分散受保护资源支路", "工具兑现捷径"],
+                "key_door_arc": "用黄门形成频繁局部选择，用蓝门形成区域承诺，并允许钥匙跨层保留。",
+                "resource_access_arc": "保持各分区总密度接近，把同类资源分散到不同访问阶段和路线区域。",
+                "combat_threshold_arc": "让分散取得的红蓝宝石分别改变后续局部战斗阈值。",
+                "tool_arc": "每层的镐、炸弹和飞行器都必须对应明确的获取成本或路线收益。",
+                "carry_forward_intent": "保留钥匙、属性或工具中的至少一种跨层取舍。",
+                "reference_patterns": [],
+            }
+        )
+    return plan
+
+
 def build_brief(form: dict[str, Any]) -> dict[str, Any]:
     form = normalize_form(form)
     floors = safe_int(form_value(form, "floors"), 4, 1, 99)
@@ -537,10 +590,10 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
 
     description = str(form_value(form, "description", "") or "").strip()
     style_name = "传统塔" if tower_style == "traditional" else "红海塔"
-    enemy_min = safe_int(form_value(form, "enemyMin"), 18 if tower_style == "traditional" else 22, 0, 120)
-    enemy_max = safe_int(form_value(form, "enemyMax"), 28 if tower_style == "traditional" else 33, enemy_min, 160)
-    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.35 if tower_style == "traditional" else 0.45, 0.1, 0.9)
-    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.45 if tower_style == "traditional" else 0.55, wall_ratio_min, 0.9)
+    enemy_min = safe_int(form_value(form, "enemyMin"), 18 if tower_style == "traditional" else 24, 0, 120)
+    enemy_max = safe_int(form_value(form, "enemyMax"), 28 if tower_style == "traditional" else 32, enemy_min, 160)
+    wall_ratio_min = safe_float(form_value(form, "wallRatioMin"), 0.35 if tower_style == "traditional" else 0.40, 0.1, 0.9)
+    wall_ratio_max = safe_float(form_value(form, "wallRatioMax"), 0.45 if tower_style == "traditional" else 0.52, wall_ratio_min, 0.9)
     special_damage_min = safe_float(form_value(form, "specialDamageMin"), 0.5, 0.0)
     special_damage_max = safe_float(form_value(form, "specialDamageMax"), 1.0, special_damage_min)
     gem_delta_min = safe_float(form_value(form, "gemFloorDeltaMin"), 0.0, 0.0, 10.0)
@@ -578,7 +631,11 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
         f"{floor_size}x{floor_size} floors",
         f"{floors} floors",
         f"tower style: {tower_style}",
-        "traditional key-door route pressure",
+        (
+            "traditional key-door route pressure"
+            if tower_style == "traditional"
+            else "red-sea fragmented local-route and distributed-resource pressure"
+        ),
         "low story; prioritize playable routes, resource pressure, and branch choices",
         "do not use red doors or red keys unless the user later adds them explicitly",
     ]
@@ -679,16 +736,20 @@ def build_brief(form: dict[str, Any]) -> dict[str, Any]:
             ]
             if tower_style == "traditional"
             else [
-                "使用有实际路线意义的破碎墙和狭窄道路，每层至少 3 条路线",
-                "墙比例 0.45-0.55，每层设置约 10-40 个局部决策点和 22-33 个怪物",
-                "资源分散放置并尽量由门、怪物、路线或现有工具保护",
+                "使用有实际路线意义的短墙块、错位缺口、狭窄短路段和频繁重新汇合，每层形成 4-5 条路线族",
+                "墙比例软目标 0.40-0.52，每层设置约 16-40 个局部决策点和 24-32 个怪物",
+                "九宫格分区密度接近，资源跨区域分散并尽量由门、怪物、路线或现有工具保护",
             ]
         ) + [
             "楼层之间拓扑结构要明显不同",
             "风格不代表数值难度，不据此调整怪物 HP、ATK 或 DEF",
             "不新增夹击、吸血、自爆、灯、箭头、单向通行或自定义脚本机制",
         ],
-        "floor_progression_plan": default_floor_progression_plan(global_limits, floors),
+        "floor_progression_plan": (
+            default_floor_progression_plan(global_limits, floors)
+            if tower_style == "traditional"
+            else red_sea_floor_progression_plan(global_limits, floors)
+        ),
         "questions": [],
         "confirmation_prompt": "确认这个全塔 brief 后开始生成整座塔。",
     }
@@ -702,9 +763,9 @@ def build_idea_prompt(form: dict[str, Any]) -> str:
 - 每层设置约 6-20 个有效决策点、18-28 个怪物和 2-6 个特殊压力位置
 - 工具平均 0.5-2 个/层，重要资源保护率 70%-90%，钥匙和资源安全余量 0%-10%"""
     else:
-        style_rules = """- 墙比例目标 0.45-0.55，使用有实际路线意义的破碎墙和狭窄道路，每层至少 3 条路线
-- 每层设置约 10-40 个局部决策点、22-33 个怪物
-- 资源分散放置，并尽量由门、怪物、路线或现有工具保护"""
+        style_rules = """- 墙比例软目标 0.40-0.52，使用有实际路线意义的短墙块、错位缺口和狭窄短路段，每层形成 4-5 条路线族
+- 每层设置约 16-40 个局部决策点、24-32 个怪物；九宫格分区视觉密度极差不超过 0.32
+- 资源跨区域分散放置，并尽量由门、怪物、路线或现有工具保护；碎墙必须改变访问成本或路线选择"""
     special_names = {1: "先攻", 2: "魔攻", 3: "坚固", 15: "领域", 18: "阻击"}
     specials = "、".join(f"{item}{special_names[item]}" for item in form["allowedSpecials"])
     description = form["description"] or "无"

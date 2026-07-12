@@ -43,12 +43,12 @@ const agentMaxAttemptDefaults = {
 
 const styleWallDefaults = {
   traditional: [0.35, 0.45],
-  red_sea: [0.45, 0.55],
+  red_sea: [0.40, 0.52],
 };
 
 const styleEnemyDefaults = {
   traditional: [18, 28],
-  red_sea: [22, 33],
+  red_sea: [24, 32],
 };
 
 const resourceDefaults = (floors, towerStyle = "traditional") => {
@@ -56,7 +56,7 @@ const resourceDefaults = (floors, towerStyle = "traditional") => {
   const pickaxes = towerStyle === "traditional" ? Math.floor((traditionalToolTotal + 2) / 3) : floors;
   const bombs = towerStyle === "traditional" ? Math.floor((traditionalToolTotal + 1) / 3) : floors;
   const centerFly = towerStyle === "traditional" ? Math.floor(traditionalToolTotal / 3) : floors;
-  return {
+  const defaults = {
   yellowDoors: floors * 4,
   blueDoors: floors * 2,
   yellowKeys: floors * 2,
@@ -73,6 +73,13 @@ const resourceDefaults = (floors, towerStyle = "traditional") => {
   yellowPotions: 0,
   greenPotions: 0,
   };
+  if (towerStyle === "red_sea") {
+    defaults.redGems = floors * 7;
+    defaults.blueGems = floors * 7;
+    defaults.redPotions = floors * 7;
+    defaults.bluePotions = floors * 3;
+  }
+  return defaults;
 };
 
 const stageLabels = {

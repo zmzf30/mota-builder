@@ -28,12 +28,11 @@ Core files:
 
 ## Tower Pipeline Rules
 
-- Use projected hero bands to keep each floor pool in a coherent relative-difficulty band.
-- Progress role lanes, not one HP/ATK/DEF staircase. Ordinary core enemies on the same floor must trade attributes; do not make one core enemy at least as high as another in all three stats.
-- Every normal floor pool needs a high-HP tank with restrained ATK/DEF and above-median combat rounds, a high-ATK enemy with low HP/DEF and at-most-median combat rounds, and a balanced or defense-threshold enemy.
-- When allowed, include a magic attacker below the floor raw-stat median and a zone elite whose HP, ATK, and DEF each reach the floor median. The zone elite is the all-round-strong exception.
-- A plain enemy below 35% of its floor median relative difficulty is low-tax. Allow at most one per traditional floor and none on red-sea floors. Red-sea may reuse an id across floors only when it remains in the ordinary difficulty band, not as a carryover role.
-- Give first-strike and repulse enemies a clear stat tradeoff; do not stack the strongest HP, ATK, and DEF on them.
+- Build a clear weak-to-strong tier ladder across the complete table so later floor selection has stronger raw-stat options.
+- Provide global role diversity across the table, including high-HP, high-ATK, balanced, defense-threshold, and allowed special-pressure options. No individual floor candidate pool must contain every role.
+- A candidate may be temporarily unbeatable for the projected hero on a floor. Do not lower or remove a tier merely to make every candidate killable.
+- For red-sea towers, size later stat tiers against the full confirmed prior-floor gem and potion budget. As projected hero ATK/DEF rises, later floor pools must also rise in raw combat strength; do not keep a mostly unchanged weak pool across several floors.
+- When an enemy id first enters a red-sea floor candidate pool, require `enemy ATK + DEF >= target projected hero ATK + DEF` for that floor. Later reuse of the same id is exempt from this debut threshold.
 
 ## Boundary
 
