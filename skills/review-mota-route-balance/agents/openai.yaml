@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Mota Route Balance"
+  short_description: "Review script-computed same-gem route costs."
+  default_prompt: "Use $review-mota-route-balance to run the route script and diagnose only route-cost imbalance."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repair Mota Route Balance"
+  short_description: "Minimally rebalance route doors and monsters."
+  default_prompt: "Use $repair-mota-route-balance to make the smallest encounter-only route-balance repair."

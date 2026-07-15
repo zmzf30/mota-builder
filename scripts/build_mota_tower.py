@@ -53,6 +53,11 @@ except ModuleNotFoundError:  # Support importing as scripts.build_mota_tower.
         stage_examples_payload,
     )
 
+try:
+    from mota_route_balance import analyze_route_balance, compact_report as compact_route_balance_report
+except ModuleNotFoundError:  # Support importing as scripts.build_mota_tower.
+    from scripts.mota_route_balance import analyze_route_balance, compact_report as compact_route_balance_report
+
 
 TRACKED_RESOURCES = [
     "yellow_doors",
@@ -87,9 +92,21 @@ AGENT_BACKENDS = ("codex", "opencode")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
-CACHE_VERSION = "token-cache-v15-encounter-stage"
-PROMPT_PAYLOAD_VERSION = "compact-prompts-v13-encounter-stage"
+CACHE_VERSION = "token-cache-v17-region-route-balance"
+PROMPT_PAYLOAD_VERSION = "compact-prompts-v15-region-route-balance"
 RED_SEA_PROMPT_BUNDLE_VERSION = "red-sea-prompts-v1"
+
+ROUTE_BALANCE_CONFIG = {
+    "required_routes": 3,
+    "ratio_threshold": 0.8,
+    "yellow_key_weight": 1.5,
+    "blue_key_weight": 2.5,
+    "red_key_weight": None,
+    "max_expansions": 40000,
+    "max_seconds": 3.0,
+    "max_routes": 10,
+    "labels_per_state": 4,
+}
 
 STYLE_SKILL_NAMES = {
     "traditional": {
@@ -6171,6 +6188,8 @@ def build_topology_prompt(
         Do not place doors, keys, resources, tools, nets, monsters, events, scripts, or decorative overlays.
         Output annotations using candidate_route, junction, region, pocket_candidate,
         shortcut_candidate, reward_room_candidate, door_candidate, and special_pressure_candidate.
+        Build at least three structurally distinct access families from the entrance toward each future
+        reward region. A family must differ by real junctions and pressure slots, not empty-ground wiggles.
         Follow input.layout_constraints for the selected tower style's route-family and opportunity
         ranges. Do not meet the opportunity target by labels alone: every opportunity coordinate must
         correspond to a real branch, pocket, junction, route neck, or shortcut in the map graph.
@@ -6232,6 +6251,8 @@ def build_economy_prompt(
         Control the entrance free region: no naked tool and no large resource exposure before cost.
         Disperse by real access cost: >=1/4 of floor gems (min 2) in one region or >=1/3 (min 3)
         across one low-cost connector fails; an annotation alone is not protection.
+        Place red/blue/green gems only in regions that retain at least three structurally distinct access
+        families from the entrance. Gemless regions are irrelevant to route-balance review.
         Follow tower_brief.tower_style: traditional style uses clear regions, multiple branch types,
         70%-90% protected important resources, and 0%-10% key/resource safety margin; red_sea style
         distributes rewards across narrow branches and protects nearly every valuable reward. Resource
@@ -6296,6 +6317,10 @@ def build_encounter_prompt(
         branch-blocking, or pressure enemies on valid ground cells while preserving economy exactly.
         Treat doors and monsters as one route-pressure system. Every door must buy reward access,
         a shortcut, a route change, or a safer combat profile; stronger doors require stronger compensation.
+        For every gem region, keep at least three actual access families close in total cost. Cost is dynamic
+        battle/zone/repulse HP loss in red-potion units plus 1.5 per yellow door and 2.5 per blue door.
+        Red doors have no configured route-balance value, so keep them outside the three compared access
+        families and use them only for unrelated optional/boss gating.
         Make same-floor monster roles meaningfully different. Zone and repulse monsters must affect a
         real route, reward entrance, shortcut, or key junction. Enforce the special whitelist,
         max_specials_per_monster, and no orthogonally adjacent enemies.
@@ -6316,6 +6341,61 @@ def build_encounter_prompt(
         Preserve and realize the matching tower_brief.floor_progression_plan combat and carry intent.
 
         {tile_catalog}
+
+        Input JSON:
+        {prompt_json(payload)}
+        """
+    ).strip()
+
+
+def is_route_balance_feedback(feedback: dict[str, Any] | None) -> bool:
+    if not isinstance(feedback, dict):
+        return False
+    if isinstance(feedback.get("route_balance_report"), dict):
+        return True
+    return any(
+        "[route-balance]" in str(issue.get("reason", ""))
+        for issue in feedback.get("issues", [])
+        if isinstance(issue, dict)
+    )
+
+
+def build_route_balance_repair_prompt(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    floor_index: int,
+    current_stage_output: dict[str, Any],
+    feedback: dict[str, Any],
+    floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+) -> str:
+    maps, enemys = load_project_tables(args)
+    payload = {
+        "floor_index": floor_index,
+        "current_encounter_output": current_stage_output,
+        "route_balance_report": compact_route_balance_report(
+            feedback.get("route_balance_report", {})
+        ),
+        "allowed_enemy_ids": (floor_policy or {}).get("allowed_enemy_ids", []),
+        "allowed_enemy_codes": (floor_policy or {}).get("allowed_enemy_codes", []),
+        "floor_contract": floor_contract or {},
+    }
+    return textwrap.dedent(
+        f"""
+        Read and follow this skill file first:
+        {skill_path(args.repo_root, "repair-mota-route-balance")}
+
+        Return one complete floor wrapper matching the supplied schema. Make the smallest encounter-only
+        repair that raises best-route/third-route cost balance toward 0.8. Preserve every wall, stair,
+        key, gem, potion, tool, event, annotation not owned by encounter, and every exact quota.
+        Prefer, in order: swap a yellow and blue door between advantaged/disadvantaged routes; swap weak
+        and strong monsters; reorder existing monsters around existing gems; replace route monsters with
+        allowed slightly stronger/weaker monsters. Do not edit enemys.js or monster stats in this basic flow.
+        Never add a fake detour. Keep enemy count, door counts, non-adjacency, and special geometry legal.
+        Change at most four map cells and explain the intended route-cost direction in annotations/summary.
+
+        Allowed encounter tiles:
+        {build_tile_catalog(maps, enemys, brief, floor_policy)}
 
         Input JSON:
         {prompt_json(payload)}
@@ -6374,8 +6454,8 @@ Required checks:
 - Final tracked-resource budget is correct.
 - Final floor has real battle pressure, key/resource pressure, protected rewards, and perceivable special pressure.
 - Broken walls serve economy: fragmented pockets or gaps must affect access cost, reward protection, tool value, special pressure, or route choice.
-- Use static_metrics.candidate_route_balance to estimate each route's key/door cost, expected HP loss, special damage, length, and reachable rewards, then judge whether alternatives form balanced tradeoffs.
-- Use static_metrics.resource_region_connection_balance; every reported hard_issue fails and returns to economy.
+- Use static_metrics.equal_gem_route_balance as authoritative. Do not recalculate route damage or add
+  path length/reward weights to its red-potion-equivalent cost.
 - Missing final win events are not a failure; write_generated_project adds the final win event after review.
 
 If an issue belongs to a specific earlier stage, set owner_stage to that earliest stage. Use owner_stage="integration"
@@ -6591,6 +6671,136 @@ def merge_structured_stage_reviews(
     }
 
 
+def route_balance_request(
+    brief: dict[str, Any],
+    floor_output: dict[str, Any],
+    previous_floor_outputs: list[dict[str, Any]],
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    floor_policy: dict[str, Any] | None,
+) -> dict[str, Any]:
+    estimated = (floor_policy or {}).get("estimated_hero_before_floor")
+    hero = (
+        core_clone(estimated)
+        if isinstance(estimated, dict)
+        else hero_state_before_floor(brief, previous_floor_outputs, maps)
+    )
+    floor = floor_output.get("floor", {})
+    try:
+        _, _, matrix = floor_dimensions(floor)
+        entry = floor_entry_coord(brief, floor_output, matrix, maps)
+    except PipelineError:
+        entry = None
+    return {
+        "floor_output": floor_output,
+        "maps": maps,
+        "enemys": enemys,
+        "hero": hero,
+        "gem_values": {
+            gem_id: gem_gain_value(brief, gem_id)
+            for gem_id in ("redGem", "blueGem", "greenGem")
+        },
+        "red_potion_hp": red_potion_value(brief),
+        "start": list(entry) if entry is not None else None,
+        "config": core_clone(ROUTE_BALANCE_CONFIG),
+    }
+
+
+def route_balance_reviewer_prompt(
+    args: argparse.Namespace,
+    request_path: Path,
+    report: dict[str, Any],
+) -> str:
+    return textwrap.dedent(
+        f"""
+        Read and follow this skill file first:
+        {skill_path(args.repo_root, "review-mota-route-balance")}
+
+        You are a narrow route-balance reviewer. Run this deterministic command before answering:
+        python3 {args.repo_root / "scripts" / "mota_route_balance.py"} --input {request_path} --compact
+
+        Do not recalculate damage and do not review unrelated map quality. The script is authoritative.
+        If it fails, identify the cheapest advantaged route and the expensive third route, then request
+        the smallest encounter-only repair involving doors or monsters. Return concise structured issues.
+
+        Compact report for reference:
+        {prompt_json(compact_route_balance_report(report))}
+        """
+    ).strip()
+
+
+def route_balance_issue_from_report(report: dict[str, Any]) -> dict[str, Any]:
+    failing = [
+        group for group in report.get("groups", [])
+        if isinstance(group, dict)
+        and not bool(group.get("selected_signature_group", {}).get("passed"))
+    ]
+    coordinates: list[list[int]] = []
+    details: list[str] = []
+    for group in failing[:4]:
+        selected = group.get("selected_signature_group", {})
+        routes = selected.get("routes", []) if isinstance(selected, dict) else []
+        costs = [route.get("cost") for route in routes[:3] if isinstance(route, dict)]
+        details.append(
+            f"region={group.get('target_region_id')} routes={selected.get('route_family_count', 0)} "
+            f"score={selected.get('balance_score', 0)} costs={costs}"
+        )
+        for route in routes[:3]:
+            if not isinstance(route, dict):
+                continue
+            for tile in route.get("pressure_tiles", [])[:4]:
+                coord = tile.get("coord") if isinstance(tile, dict) else None
+                if isinstance(coord, list) and len(coord) == 2 and coord not in coordinates:
+                    coordinates.append(coord)
+    reason = (
+        "[route-balance] fewer than three close same-gem route families or best/third cost ratio below 0.8: "
+        + "; ".join(details)
+    )
+    change = (
+        "Repair only doors and monsters on the reported routes. Prefer swapping yellow/blue doors, "
+        "swapping weak/strong monsters, or moving threshold monsters before/after existing gems; preserve "
+        "all walls, stairs, resources, quotas, and unrelated routes, then rerun the route-balance script."
+    )
+    return structured_issue("encounter", "fail", reason, change, coordinates[:12], "encounter")
+
+
+def run_route_balance_review(
+    args: argparse.Namespace,
+    prefix: Path,
+    request: dict[str, Any],
+    run_agent: bool = True,
+) -> dict[str, Any]:
+    request_path = prefix.with_suffix(".route-balance.input.json")
+    report_path = prefix.with_suffix(".route-balance.metrics.json")
+    write_json(request_path, request)
+    report = analyze_route_balance(request)
+    write_json(report_path, report)
+    if report.get("status") == "pass":
+        review = structured_review("encounter", [], empty_budget(), str(report.get("summary", "Route balance passed.")))
+        review["route_balance_report"] = report
+        return review
+
+    local = structured_review(
+        "encounter",
+        [route_balance_issue_from_report(report)],
+        empty_budget(),
+        str(report.get("summary", "Route balance failed.")),
+    )
+    local["route_balance_report"] = report
+    if not run_agent:
+        return local
+    agent_review = agent_exec(
+        args,
+        route_balance_reviewer_prompt(args, request_path, report),
+        STRUCTURED_REVIEW_SCHEMA,
+        prefix.with_suffix(".route-balance.review.json"),
+    )
+    merged = merge_structured_stage_reviews("encounter", local, agent_review, empty_budget())
+    merged["route_balance_report"] = report
+    write_json(prefix.with_suffix(".route-balance.review.merged.json"), merged)
+    return merged
+
+
 def run_staged_review(
     args: argparse.Namespace,
     prefix: Path,
@@ -6611,6 +6821,7 @@ def run_staged_review(
     economy_output: dict[str, Any] | None = None,
     run_llm_review: bool = True,
 ) -> dict[str, Any]:
+    route_balance_review: dict[str, Any] | None = None
     expected_floor_id = f"{args.floor_prefix}{int(stage_output.get('floor_index', 0)) + args.floor_number_offset}"
     if stage_output.get("floor_index") != prefix_stage_floor_index(prefix):
         expected_floor_id = f"{args.floor_prefix}{prefix_stage_floor_index(prefix) + args.floor_number_offset}"
@@ -6670,14 +6881,24 @@ def run_staged_review(
             enforce_resource_progression,
             args.max_wall_similarity,
         )
-        metrics["candidate_route_balance"] = integration_candidate_route_analysis(
-            stage_output,
-            topology_output,
-            brief,
-            previous_floor_outputs,
-            maps,
-            enemys,
+        route_balance_review = run_route_balance_review(
+            args,
+            prefix,
+            route_balance_request(
+                brief,
+                stage_output,
+                previous_floor_outputs,
+                maps,
+                enemys,
+                floor_policy,
+            ),
+            run_agent=run_llm_review,
         )
+        metrics["equal_gem_route_balance"] = compact_route_balance_report(
+            route_balance_review.get("route_balance_report", {})
+        )
+        if route_balance_review.get("status") != "pass":
+            issues.extend(normalize_structured_issues(route_balance_review, "encounter"))
         if tower_style(brief) == "red_sea":
             red_sea_metrics = spatial_density_and_fragmentation_metrics(stage_output, maps)
             metrics["red_sea_density_fragmentation"] = red_sea_metrics
@@ -6705,25 +6926,6 @@ def run_staged_review(
                         repair_stage="encounter",
                     )
                 )
-        resource_region_review = gem_route_balance_review(
-            brief,
-            stage_output,
-            previous_floor_outputs,
-            maps,
-            enemys,
-        )
-        metrics["resource_region_connection_balance"] = resource_region_review
-        for hard_issue in resource_region_review.get("hard_issues", []):
-            if not isinstance(hard_issue, dict):
-                continue
-            issues.append(structured_issue(
-                "economy",
-                "fail",
-                str(hard_issue.get("reason", "Resource dispersion hard check failed.")),
-                str(hard_issue.get("required_change", "Disperse the concentrated resources.")),
-                hard_issue.get("coordinates") if isinstance(hard_issue.get("coordinates"), list) else None,
-                repair_stage="economy",
-            ))
     else:
         raise PipelineError(f"Unknown staged review stage: {stage}")
 
@@ -6734,6 +6936,8 @@ def run_staged_review(
         delta,
         f"Local {stage} review {'failed' if any(issue['severity'] == 'fail' for issue in issues) else 'passed'}.",
     )
+    if route_balance_review is not None:
+        local_review["route_balance_report"] = route_balance_review.get("route_balance_report", {})
     write_json(prefix.with_suffix(f".review.{stage}.local.json"), local_review)
     if local_review["status"] != "pass" or not run_llm_review:
         return local_review
@@ -6759,6 +6963,8 @@ def run_staged_review(
         prefix.with_suffix(f".review.{stage}.json"),
     )
     review = merge_structured_stage_reviews(stage, local_review, llm_review, delta)
+    if route_balance_review is not None:
+        review["route_balance_report"] = route_balance_review.get("route_balance_report", {})
     write_json(prefix.with_suffix(f".review.{stage}.merged.json"), review)
     return review
 
@@ -6823,31 +7029,55 @@ def select_final_floor_candidate(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not candidates:
         raise PipelineError(f"MT{floor_index} has no complete candidates for final selection.")
-    selection = agent_exec(
-        args,
-        final_candidate_selection_prompt(
-            args,
-            brief,
-            floor_index,
-            candidates,
-            used,
-            limits,
-            floor_policy,
-            floor_contract,
-        ),
-        FINAL_CANDIDATE_SELECTION_SCHEMA,
-        args.out_dir / "floors" / f"MT{floor_index}.final-selection.json",
-    )
-    selected_id = str(selection.get("selected_candidate_id", ""))
-    selected = next(
-        (candidate for candidate in candidates if candidate["candidate_id"] == selected_id),
-        None,
-    )
-    if selected is None:
-        allowed = ", ".join(candidate["candidate_id"] for candidate in candidates)
-        raise PipelineError(
-            f"MT{floor_index} selector returned unknown candidate {selected_id!r}; expected one of: {allowed}."
+    def candidate_rank(candidate: dict[str, Any]) -> tuple[int, float, float, int, int]:
+        previous_review = candidate.get("review", {})
+        if not isinstance(previous_review, dict):
+            previous_review = {}
+        report = previous_review.get("route_balance_report", {})
+        if not isinstance(report, dict):
+            report = {}
+        non_balance_failures = sum(
+            1
+            for issue in previous_review.get("issues", [])
+            if isinstance(issue, dict)
+            and issue.get("severity") == "fail"
+            and "[route-balance]" not in str(issue.get("reason", ""))
         )
+        group_scores = [
+            float(group.get("selected_signature_group", {}).get("balance_score", 0.0))
+            for group in report.get("groups", [])
+            if isinstance(group, dict)
+        ]
+        comparable_groups = sum(
+            1
+            for group in report.get("groups", [])
+            if isinstance(group, dict)
+            and int(group.get("selected_signature_group", {}).get("route_family_count", 0))
+            >= int(report.get("required_routes", 3))
+        )
+        return (
+            -non_balance_failures,
+            float(report.get("balance_score", 0.0)),
+            (sum(group_scores) / len(group_scores)) if group_scores else 0.0,
+            comparable_groups,
+            int(candidate.get("attempt", 0)),
+        )
+
+    selected = max(candidates, key=candidate_rank)
+    selected_id = str(selected["candidate_id"])
+    selection = {
+        "selected_candidate_id": selected_id,
+        "summary": (
+            "Deterministically selected the legal candidate with the fewest non-balance failures, "
+            "then the highest worst-group and average route-balance scores."
+        ),
+        "rank": candidate_rank(selected),
+        "candidate_scores": [
+            {"candidate_id": candidate["candidate_id"], "rank": candidate_rank(candidate)}
+            for candidate in candidates
+        ],
+    }
+    write_json(args.out_dir / "floors" / f"MT{floor_index}.final-selection.json", selection)
     review = {
         "status": "pass",
         "issues": [],
@@ -7051,18 +7281,6 @@ def final_tower_validation_issues(
         local_issues.extend(high_value_pocket_metric_issues(metrics))
         local_issues.extend(wall_mask_similarity_issues(previous_floors, floor_output, maps, args.max_wall_similarity))
         local_issues.extend(floor_resource_progression_issues(brief, previous_floors, floor_output, maps))
-        dispersion_review = gem_route_balance_review(
-            brief,
-            floor_output,
-            previous_floors,
-            maps,
-            enemys,
-        )
-        local_issues.extend(
-            str(issue.get("reason", "Resource dispersion hard check failed."))
-            for issue in dispersion_review.get("hard_issues", [])
-            if isinstance(issue, dict)
-        )
         if local_issues:
             issues.extend(f"{expected_floor_id}: {issue}" for issue in local_issues[:8])
         recounted = add_budget(recounted, delta)
@@ -7830,9 +8048,22 @@ def generate_floor_staged_with_retries(
         if stage_start <= STAGE_ORDER["encounter"]:
             stage_prefix = args.out_dir / "floors" / f"MT{floor_index}_attempt{attempt}_encounter"
             try:
-                encounter_output = agent_exec(
-                    args,
-                    build_encounter_prompt(
+                encounter_prompt = (
+                    build_route_balance_repair_prompt(
+                        args,
+                        brief,
+                        floor_index,
+                        repair_stage_outputs["encounter"],
+                        feedback,
+                        floor_policy,
+                        floor_contract,
+                    )
+                    if (
+                        active_repair_stage == "encounter"
+                        and is_route_balance_feedback(feedback)
+                        and isinstance(repair_stage_outputs.get("encounter"), dict)
+                    )
+                    else build_encounter_prompt(
                         args,
                         brief,
                         floor_index,
@@ -7847,7 +8078,11 @@ def generate_floor_staged_with_retries(
                         repair_stage_outputs.get("encounter")
                         if feedback is not None and active_repair_stage == "encounter"
                         else None,
-                    ),
+                    )
+                )
+                encounter_output = agent_exec(
+                    args,
+                    encounter_prompt,
                     STAGED_FLOOR_SCHEMA,
                     stage_prefix.with_suffix(".floor.json"),
                 )
@@ -9638,7 +9873,7 @@ def self_test(repo_root: Path) -> int:
         assert not is_forced_accept_review(forced_result["review"])
         assert forced_result["review"]["best_effort_selection"] is True
         assert forced_result["review"]["selected_candidate_id"] == "MT0-attempt1"
-        assert len(fake_calls) == 4
+        assert len(fake_calls) == 3
         archived_candidates = json.loads(
             (Path(forced_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
         )
@@ -9717,8 +9952,8 @@ def self_test(repo_root: Path) -> int:
             )
         finally:
             globals()["agent_exec"] = original_agent_exec
-        assert selection_result["floor_output"]["summary"] == "earlier complete candidate"
-        assert selection_result["review"]["selected_candidate_id"] == "MT0-attempt1"
+        assert selection_result["floor_output"]["summary"] == "final complete candidate"
+        assert selection_result["review"]["selected_candidate_id"] == "MT0-attempt2"
         archived_candidates = json.loads(
             (Path(selection_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
         )
@@ -10300,6 +10535,8 @@ def self_test(repo_root: Path) -> int:
         "review-mota-enemy-table",
         "review-mota-floor",
         "review-red-sea-mota-floor",
+        "review-mota-route-balance",
+        "repair-mota-route-balance",
         "playtest-mota-game",
         "topology-mota-floor",
         "topology-red-sea-mota-floor",
