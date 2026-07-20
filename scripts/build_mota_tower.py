@@ -54,9 +54,9 @@ except ModuleNotFoundError:  # Support importing as scripts.build_mota_tower.
     )
 
 try:
-    from mota_route_balance import analyze_route_balance, compact_report as compact_route_balance_report
+    from mota_route_balance import analyze_route_review, compact_report as compact_route_balance_report
 except ModuleNotFoundError:  # Support importing as scripts.build_mota_tower.
-    from scripts.mota_route_balance import analyze_route_balance, compact_report as compact_route_balance_report
+    from scripts.mota_route_balance import analyze_route_review, compact_report as compact_route_balance_report
 
 
 TRACKED_RESOURCES = [
@@ -92,8 +92,8 @@ AGENT_BACKENDS = ("codex", "opencode")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
-CACHE_VERSION = "token-cache-v17-region-route-balance"
-PROMPT_PAYLOAD_VERSION = "compact-prompts-v15-region-route-balance"
+CACHE_VERSION = "token-cache-v18-route-sensitivity"
+PROMPT_PAYLOAD_VERSION = "compact-prompts-v16-route-sensitivity"
 RED_SEA_PROMPT_BUNDLE_VERSION = "red-sea-prompts-v1"
 
 ROUTE_BALANCE_CONFIG = {
@@ -106,6 +106,8 @@ ROUTE_BALANCE_CONFIG = {
     "max_seconds": 3.0,
     "max_routes": 10,
     "labels_per_state": 4,
+    "sensitivity_monster_sample_size": 5,
+    "sensitivity_seed": "route-sensitivity-v1",
 }
 
 STYLE_SKILL_NAMES = {
@@ -299,6 +301,8 @@ def beginner_review_reason(summary: str) -> str:
         add("宝石或血瓶的跨层增长不符合设置")
     if "entry-to-gem route is too easy" in lower:
         add("到宝石的路线太容易，缺少取舍")
+    if "route sensitivity" in lower and re.search(r"inert doors=[1-9]\d*", lower):
+        add("有些黄门或蓝门移除后不影响前三条路线")
     if "large direct resource region" in lower:
         add("有一大片奖励拿得太直接")
     if "gem concentration" in lower or "formally separated resource regions" in lower:
@@ -6354,7 +6358,10 @@ def is_route_balance_feedback(feedback: dict[str, Any] | None) -> bool:
     if isinstance(feedback.get("route_balance_report"), dict):
         return True
     return any(
-        "[route-balance]" in str(issue.get("reason", ""))
+        any(
+            marker in str(issue.get("reason", ""))
+            for marker in ("[route-balance]", "[route-sensitivity]")
+        )
         for issue in feedback.get("issues", [])
         if isinstance(issue, dict)
     )
@@ -6386,13 +6393,19 @@ def build_route_balance_repair_prompt(
         {skill_path(args.repo_root, "repair-mota-route-balance")}
 
         Return one complete floor wrapper matching the supplied schema. Make the smallest encounter-only
-        repair that raises best-route/third-route cost balance toward 0.8. Preserve every wall, stair,
+        repair requested by the route-balance and sensitivity report. Preserve every wall, stair,
         key, gem, potion, tool, event, annotation not owned by encounter, and every exact quota.
+        Every door listed under sensitivity.inert_doors must be moved to a position where removing it
+        changes the ordered top three routes. Move, rather than delete, doors so exact door quotas remain
+        unchanged. For sampled monsters cited by a failing issue, move the same monster to a meaningful
+        route-choice position while preserving enemy count. The next review reruns the complete baseline,
+        every-door, and sampled-monster test from the beginning.
         Prefer, in order: swap a yellow and blue door between advantaged/disadvantaged routes; swap weak
         and strong monsters; reorder existing monsters around existing gems; replace route monsters with
         allowed slightly stronger/weaker monsters. Do not edit enemys.js or monster stats in this basic flow.
         Never add a fake detour. Keep enemy count, door counts, non-adjacency, and special geometry legal.
-        Change at most four map cells and explain the intended route-cost direction in annotations/summary.
+        Change only the reported encounter placements and their destinations, and explain the intended
+        route-choice effect in annotations/summary.
 
         Allowed encounter tiles:
         {build_tile_catalog(maps, enemys, brief, floor_policy)}
@@ -6720,8 +6733,11 @@ def route_balance_reviewer_prompt(
         python3 {args.repo_root / "scripts" / "mota_route_balance.py"} --input {request_path} --compact
 
         Do not recalculate damage and do not review unrelated map quality. The script is authoritative.
-        If it fails, identify the cheapest advantaged route and the expensive third route, then request
-        the smallest encounter-only repair involving doors or monsters. Return concise structured issues.
+        A door in sensitivity.inert_doors is always a failure and must be moved without changing quotas.
+        For sensitivity.inert_monsters, decide narrowly whether the sampled optional monster has a clear
+        non-Top-3 role such as guarding a reward or providing special coverage. If not, fail it and request
+        relocation; otherwise return only a warning. For base route-balance failures, request the smallest
+        encounter-only door/monster repair. Return concise structured issues.
 
         Compact report for reference:
         {prompt_json(compact_route_balance_report(report))}
@@ -6764,6 +6780,38 @@ def route_balance_issue_from_report(report: dict[str, Any]) -> dict[str, Any]:
     return structured_issue("encounter", "fail", reason, change, coordinates[:12], "encounter")
 
 
+def route_sensitivity_issues_from_report(report: dict[str, Any]) -> list[dict[str, Any]]:
+    sensitivity = report.get("sensitivity", {})
+    if not isinstance(sensitivity, dict):
+        return []
+    inert_doors = [item for item in sensitivity.get("inert_doors", []) if isinstance(item, dict)]
+    inert_monsters = [item for item in sensitivity.get("inert_monsters", []) if isinstance(item, dict)]
+    issues: list[dict[str, Any]] = []
+    if inert_doors:
+        coordinates = [item.get("coord") for item in inert_doors if isinstance(item.get("coord"), list)][:12]
+        details = ", ".join(f"{item.get('id')}@{item.get('coord')}" for item in inert_doors)
+        issues.append(structured_issue(
+            "encounter",
+            "fail",
+            f"[route-sensitivity] removing these yellow/blue doors did not change the ordered Top-3 routes: {details}",
+            "Move every listed door to a route-choice position; preserve each door type and exact door quotas, then rerun the full sensitivity test.",
+            coordinates,
+            "encounter",
+        ))
+    if inert_monsters:
+        coordinates = [item.get("coord") for item in inert_monsters if isinstance(item.get("coord"), list)][:12]
+        details = ", ".join(f"{item.get('id')}@{item.get('coord')}" for item in inert_monsters)
+        issues.append(structured_issue(
+            "encounter",
+            "warn",
+            f"[route-sensitivity] removing these sampled optional monsters did not change the ordered Top-3 routes: {details}",
+            "Check each listed monster for a concrete reward-guard or special-coverage role; otherwise move it to affect route choice while preserving enemy count.",
+            coordinates,
+            "encounter",
+        ))
+    return issues
+
+
 def run_route_balance_review(
     args: argparse.Namespace,
     prefix: Path,
@@ -6773,18 +6821,27 @@ def run_route_balance_review(
     request_path = prefix.with_suffix(".route-balance.input.json")
     report_path = prefix.with_suffix(".route-balance.metrics.json")
     write_json(request_path, request)
-    report = analyze_route_balance(request)
+    report = analyze_route_review(request)
     write_json(report_path, report)
-    if report.get("status") == "pass":
-        review = structured_review("encounter", [], empty_budget(), str(report.get("summary", "Route balance passed.")))
+    sensitivity_issues = route_sensitivity_issues_from_report(report)
+    if report.get("status") == "pass" and not sensitivity_issues:
+        summary = str(report.get("sensitivity", {}).get("summary") or report.get("summary", "Route balance passed."))
+        review = structured_review("encounter", [], empty_budget(), summary)
         review["route_balance_report"] = report
         return review
 
+    local_issues = [] if report.get("status") == "pass" else [route_balance_issue_from_report(report)]
+    local_issues.extend(sensitivity_issues)
     local = structured_review(
         "encounter",
-        [route_balance_issue_from_report(report)],
+        local_issues,
         empty_budget(),
-        str(report.get("summary", "Route balance failed.")),
+        " | ".join(
+            part for part in (
+                str(report.get("summary", "Route balance review completed.")),
+                str(report.get("sensitivity", {}).get("summary", "")),
+            ) if part
+        ),
     )
     local["route_balance_report"] = report
     if not run_agent:
@@ -7029,19 +7086,26 @@ def select_final_floor_candidate(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not candidates:
         raise PipelineError(f"MT{floor_index} has no complete candidates for final selection.")
-    def candidate_rank(candidate: dict[str, Any]) -> tuple[int, float, float, int, int]:
+
+    def candidate_rank(
+        candidate: dict[str, Any],
+    ) -> tuple[int, int, int, int, int, float, float, int, int]:
         previous_review = candidate.get("review", {})
         if not isinstance(previous_review, dict):
             previous_review = {}
         report = previous_review.get("route_balance_report", {})
         if not isinstance(report, dict):
             report = {}
+        sensitivity = report.get("sensitivity", {})
+        if not isinstance(sensitivity, dict):
+            sensitivity = {}
         non_balance_failures = sum(
             1
             for issue in previous_review.get("issues", [])
             if isinstance(issue, dict)
             and issue.get("severity") == "fail"
             and "[route-balance]" not in str(issue.get("reason", ""))
+            and "[route-sensitivity]" not in str(issue.get("reason", ""))
         )
         group_scores = [
             float(group.get("selected_signature_group", {}).get("balance_score", 0.0))
@@ -7057,20 +7121,78 @@ def select_final_floor_candidate(
         )
         return (
             -non_balance_failures,
+            int(report.get("status") == "pass"),
+            int(
+                sensitivity.get("status") in {"pass", "fail"}
+                and int(sensitivity.get("inconclusive_count", 0)) == 0
+            ),
+            -len(sensitivity.get("inert_doors", [])),
+            -len(sensitivity.get("inert_monsters", [])),
             float(report.get("balance_score", 0.0)),
             (sum(group_scores) / len(group_scores)) if group_scores else 0.0,
             comparable_groups,
             int(candidate.get("attempt", 0)),
         )
 
-    selected = max(candidates, key=candidate_rank)
+    fallback = max(candidates, key=candidate_rank)
+    compact_candidates = []
+    for candidate in candidates:
+        previous_review = candidate.get("review", {})
+        report = previous_review.get("route_balance_report", {}) if isinstance(previous_review, dict) else {}
+        compact_candidates.append({
+            "candidate_id": candidate.get("candidate_id"),
+            "attempt": candidate.get("attempt"),
+            "rejected_at": candidate.get("rejected_at"),
+            "encounter_output": candidate.get("encounter_output"),
+            "review_issues": previous_review.get("issues", []) if isinstance(previous_review, dict) else [],
+            "route_review": compact_route_balance_report(report if isinstance(report, dict) else {}),
+            "fallback_rank": candidate_rank(candidate),
+        })
+    selector_prompt = textwrap.dedent(
+        f"""
+        Select the best available complete floor candidate after the configured retry limit was reached.
+        Return exactly one candidate_id from the input. Judge the floor as a whole, but strongly prefer:
+        no non-route legality failures; passing base three-route balance; a complete sensitivity run;
+        no inert yellow/blue doors; then fewer inert sampled optional monsters. An inert door is a hard
+        defect. An inert sampled monster may be retained only when the map clearly shows a useful
+        reward-guard or special-coverage role. Do not propose edits and do not invent another candidate.
+
+        Floor index: {floor_index}
+        Floor contract: {prompt_json(floor_contract or {})}
+        Candidates:
+        {prompt_json(compact_candidates)}
+        """
+    ).strip()
+    selector = "agent"
+    try:
+        agent_selection = agent_exec(
+            args,
+            selector_prompt,
+            FINAL_CANDIDATE_SELECTION_SCHEMA,
+            args.out_dir / "floors" / f"MT{floor_index}.final-selection.agent.json",
+        )
+    except Exception as exc:  # noqa: BLE001 - preserve best-effort completion if selector fails.
+        agent_selection = {
+            "selected_candidate_id": fallback.get("candidate_id"),
+            "summary": f"Selector failed; used deterministic fallback: {exc}",
+        }
+        selector = "deterministic_fallback"
+    by_id = {str(candidate.get("candidate_id")): candidate for candidate in candidates}
+    requested_id = str(agent_selection.get("selected_candidate_id", ""))
+    if requested_id not in by_id:
+        agent_selection = {
+            "selected_candidate_id": fallback.get("candidate_id"),
+            "summary": (
+                f"Selector returned unknown candidate {requested_id!r}; used deterministic fallback."
+            ),
+        }
+        selector = "deterministic_fallback"
+    selected = by_id[str(agent_selection["selected_candidate_id"])]
     selected_id = str(selected["candidate_id"])
     selection = {
         "selected_candidate_id": selected_id,
-        "summary": (
-            "Deterministically selected the legal candidate with the fewest non-balance failures, "
-            "then the highest worst-group and average route-balance scores."
-        ),
+        "summary": str(agent_selection.get("summary", "Selected the best available candidate."))[:1600],
+        "selector": selector,
         "rank": candidate_rank(selected),
         "candidate_scores": [
             {"candidate_id": candidate["candidate_id"], "rank": candidate_rank(candidate)}
@@ -9873,7 +9995,8 @@ def self_test(repo_root: Path) -> int:
         assert not is_forced_accept_review(forced_result["review"])
         assert forced_result["review"]["best_effort_selection"] is True
         assert forced_result["review"]["selected_candidate_id"] == "MT0-attempt1"
-        assert len(fake_calls) == 3
+        assert len(fake_calls) == 4
+        assert "MT0.final-selection.agent.json" in fake_calls
         archived_candidates = json.loads(
             (Path(forced_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
         )
@@ -9952,8 +10075,9 @@ def self_test(repo_root: Path) -> int:
             )
         finally:
             globals()["agent_exec"] = original_agent_exec
-        assert selection_result["floor_output"]["summary"] == "final complete candidate"
-        assert selection_result["review"]["selected_candidate_id"] == "MT0-attempt2"
+        assert selection_result["floor_output"]["summary"] == "earlier complete candidate"
+        assert selection_result["review"]["selected_candidate_id"] == "MT0-attempt1"
+        assert selection_result["review"]["selection"]["selector"] == "agent"
         archived_candidates = json.loads(
             (Path(selection_tmp) / "floors" / "MT0.candidates.json").read_text(encoding="utf-8")
         )

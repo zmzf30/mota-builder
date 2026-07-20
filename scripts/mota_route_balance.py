@@ -5,12 +5,17 @@ The search deliberately models only mechanics used by the generator: ordinary
 combat, first strike, magic attack, solid defense, zone, repulse, doors, and
 red/blue/green gems.  HP and keys are assumed sufficient; their consumption is
 measured instead of used as a feasibility constraint.
+
+The reviewer also reruns the search after removing each yellow/blue door and a
+deterministic sample of five optional enemies to detect inert placements.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 from dataclasses import dataclass
+import hashlib
 import heapq
 import json
 import math
@@ -137,6 +142,13 @@ def _resource_signature(mask: int, gems: list[dict[str, Any]]) -> tuple[int, int
         if mask & (1 << index):
             counts[str(gem["id"])] += 1
     return counts["redGem"], counts["blueGem"], counts["greenGem"]
+
+
+def _gem_coords(mask: int, gems: list[dict[str, Any]]) -> list[list[int]]:
+    return sorted(
+        [list(gem["coord"]) for index, gem in enumerate(gems) if mask & (1 << index)],
+        key=lambda coord: (coord[1], coord[0]),
+    )
 
 
 def _cost(label: Label, red_potion_hp: float, yellow_weight: float, blue_weight: float, red_weight: float | None) -> float:
@@ -433,7 +445,23 @@ def _compact_routes(routes: list[dict[str, Any]], limit: int) -> list[dict[str, 
         old = by_family.get(family)
         if old is None or route["cost"] < old["cost"]:
             by_family[family] = route
-    ordered = sorted(by_family.values(), key=lambda route: (route["cost"], route["steps"]))
+    ordered = sorted(
+        by_family.values(),
+        key=lambda route: (
+            route["cost"],
+            route["steps"],
+            tuple(
+                (
+                    int(tile.get("coord", [0, 0])[0]),
+                    int(tile.get("coord", [0, 0])[1]),
+                    str(tile.get("kind", "")),
+                    str(tile.get("id", "")),
+                )
+                for tile in route.get("pressure_tiles", [])
+                if isinstance(tile, dict)
+            ),
+        ),
+    )
     kept: list[dict[str, Any]] = []
     for route in ordered:
         if any(_route_fully_dominates(other, route) for other in kept):
@@ -853,6 +881,7 @@ def analyze_route_balance(request: dict[str, Any]) -> dict[str, Any]:
             {
                 "target_region_id": region_id,
                 "target_bbox": target["bbox"],
+                "target_gem_coords": _gem_coords(int(target["gem_mask"]), gems),
                 "target_gems": {
                     "redGem": required_signature[0],
                     "blueGem": required_signature[1],
@@ -913,6 +942,273 @@ def analyze_route_balance(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _stable_top_three(
+    report: dict[str, Any],
+    omitted_coord: tuple[int, int] | None = None,
+) -> list[dict[str, Any]]:
+    """Return comparable top-three route identities without scan-order indexes.
+
+    A tested obstacle is omitted from the baseline identity so merely removing
+    that tile does not count as a route change. Rank order remains significant.
+    """
+    groups: list[dict[str, Any]] = []
+    for group in report.get("groups", []):
+        if not isinstance(group, dict):
+            continue
+        selected = group.get("selected_signature_group", {})
+        if not isinstance(selected, dict):
+            selected = {}
+        routes: list[list[list[Any]]] = []
+        for route in selected.get("routes", [])[:3]:
+            if not isinstance(route, dict):
+                continue
+            signature: list[list[Any]] = []
+            for tile in route.get("pressure_tiles", []):
+                if not isinstance(tile, dict):
+                    continue
+                coord = tile.get("coord")
+                if not (
+                    isinstance(coord, list)
+                    and len(coord) == 2
+                    and all(isinstance(value, int) and not isinstance(value, bool) for value in coord)
+                ):
+                    continue
+                stable_coord = (coord[0], coord[1])
+                if omitted_coord is not None and stable_coord == omitted_coord:
+                    continue
+                signature.append([
+                    coord[0],
+                    coord[1],
+                    str(tile.get("kind", "")),
+                    str(tile.get("id", "")),
+                ])
+            routes.append(signature)
+        target_coords = group.get("target_gem_coords", [])
+        groups.append({
+            "target_gem_coords": sorted(
+                [list(coord) for coord in target_coords if isinstance(coord, list) and len(coord) == 2],
+                key=lambda coord: (coord[1], coord[0]),
+            ),
+            "resource_signature": selected.get("resource_signature"),
+            "routes": routes,
+        })
+    groups.sort(key=lambda group: json.dumps(group["target_gem_coords"], separators=(",", ":")))
+    return groups
+
+
+def _snapshot_digest(snapshot: list[dict[str, Any]]) -> str:
+    payload = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _requested_start(
+    request: dict[str, Any],
+    matrix: list[list[int]],
+    maps: dict[str, Any],
+) -> tuple[int, int] | None:
+    requested = request.get("start")
+    height = len(matrix)
+    width = len(matrix[0]) if height else 0
+    if (
+        isinstance(requested, list)
+        and len(requested) == 2
+        and all(isinstance(value, int) and not isinstance(value, bool) for value in requested)
+        and 0 <= requested[0] < width
+        and 0 <= requested[1] < height
+    ):
+        return requested[0], requested[1]
+    for y, row in enumerate(matrix):
+        for x, raw_code in enumerate(row):
+            if maps.get(str(int(raw_code)), {}).get("id") == "downFloor":
+                return x, y
+    return None
+
+
+def _reachable_coords_without(
+    matrix: list[list[int]],
+    maps: dict[str, Any],
+    start: tuple[int, int],
+    blocked: tuple[int, int],
+) -> set[tuple[int, int]]:
+    if start == blocked:
+        return set()
+    height = len(matrix)
+    width = len(matrix[0]) if height else 0
+    seen = {start}
+    stack = [start]
+    while stack:
+        x, y = stack.pop()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nxt = (x + dx, y + dy)
+            nx, ny = nxt
+            if nxt == blocked or nxt in seen or not (0 <= nx < width and 0 <= ny < height):
+                continue
+            code = int(matrix[ny][nx])
+            if not _passable(code, maps.get(str(code), {})):
+                continue
+            seen.add(nxt)
+            stack.append(nxt)
+    return seen
+
+
+def _optional_enemy_tiles(
+    request: dict[str, Any],
+    baseline_report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    floor_output = request.get("floor_output", {})
+    floor = floor_output.get("floor", floor_output)
+    matrix = floor.get("map", []) if isinstance(floor, dict) else []
+    maps = request.get("maps", {})
+    if not isinstance(matrix, list) or not matrix or not isinstance(matrix[0], list):
+        return []
+    start = _requested_start(request, matrix, maps)
+    if start is None:
+        return []
+    target_coords = {
+        (int(coord[0]), int(coord[1]))
+        for group in baseline_report.get("groups", [])
+        if isinstance(group, dict)
+        for coord in group.get("target_gem_coords", [])
+        if isinstance(coord, list) and len(coord) == 2
+    }
+    candidates: list[dict[str, Any]] = []
+    for y, row in enumerate(matrix):
+        for x, raw_code in enumerate(row):
+            code = int(raw_code)
+            entry = maps.get(str(code), {})
+            if not _is_enemy(entry):
+                continue
+            reachable = _reachable_coords_without(matrix, maps, start, (x, y))
+            if target_coords.issubset(reachable):
+                candidates.append({"coord": [x, y], "id": str(entry.get("id", "")), "code": code})
+    return candidates
+
+
+def _deterministic_monster_sample(
+    candidates: list[dict[str, Any]],
+    floor_id: str,
+    sample_size: int,
+    seed: str,
+) -> list[dict[str, Any]]:
+    def sample_key(item: dict[str, Any]) -> str:
+        coord = item["coord"]
+        raw = f"{seed}|{floor_id}|{coord[0]},{coord[1]}|{item['id']}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    return sorted(candidates, key=lambda item: (sample_key(item), item["coord"][1], item["coord"][0]))[
+        :sample_size
+    ]
+
+
+def analyze_route_sensitivity(
+    request: dict[str, Any],
+    baseline_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Ablate every yellow/blue door and five optional enemies one at a time."""
+    baseline = baseline_report if isinstance(baseline_report, dict) else analyze_route_balance(request)
+    if baseline.get("status") != "pass":
+        return {
+            "status": "skipped",
+            "reason": "baseline route balance must pass before sensitivity testing",
+            "door_tests": [],
+            "monster_tests": [],
+            "inert_doors": [],
+            "inert_monsters": [],
+        }
+    if bool(baseline.get("search", {}).get("truncated")):
+        return {
+            "status": "skipped",
+            "reason": "baseline route search was truncated",
+            "door_tests": [],
+            "monster_tests": [],
+            "inert_doors": [],
+            "inert_monsters": [],
+        }
+
+    floor_output = request.get("floor_output", {})
+    floor = floor_output.get("floor", floor_output)
+    matrix = floor.get("map", []) if isinstance(floor, dict) else []
+    maps = request.get("maps", {})
+    config = request.get("config", {}) if isinstance(request.get("config"), dict) else {}
+    sample_size = max(0, int(config.get("sensitivity_monster_sample_size", 5)))
+    seed = str(config.get("sensitivity_seed", "route-sensitivity-v1"))
+    floor_id = str(floor.get("floorId", floor_output.get("floor_id", ""))) if isinstance(floor, dict) else ""
+
+    doors: list[dict[str, Any]] = []
+    for y, row in enumerate(matrix):
+        for x, raw_code in enumerate(row):
+            code = int(raw_code)
+            entry = maps.get(str(code), {})
+            if _door_kind(entry) in {"yellow", "blue"}:
+                doors.append({"coord": [x, y], "id": str(entry.get("id", "")), "code": code})
+    optional_enemies = _optional_enemy_tiles(request, baseline)
+    sampled_enemies = _deterministic_monster_sample(optional_enemies, floor_id, sample_size, seed)
+
+    def run_test(item: dict[str, Any]) -> dict[str, Any]:
+        coord = (int(item["coord"][0]), int(item["coord"][1]))
+        before = _stable_top_three(baseline, coord)
+        perturbed_request = dict(request)
+        perturbed_request["floor_output"] = copy.deepcopy(request.get("floor_output", {}))
+        perturbed_floor_output = perturbed_request.get("floor_output", {})
+        perturbed_floor = perturbed_floor_output.get("floor", perturbed_floor_output)
+        perturbed_floor["map"][coord[1]][coord[0]] = 0
+        try:
+            perturbed = analyze_route_balance(perturbed_request)
+        except (TypeError, ValueError, KeyError, IndexError) as exc:
+            return {
+                "coord": list(coord),
+                "id": item["id"],
+                "changed": None,
+                "inconclusive": True,
+                "reason": str(exc),
+                "before_digest": _snapshot_digest(before),
+                "after_digest": None,
+            }
+        after = _stable_top_three(perturbed)
+        truncated = bool(perturbed.get("search", {}).get("truncated"))
+        return {
+            "coord": list(coord),
+            "id": item["id"],
+            "changed": None if truncated else before != after,
+            "inconclusive": truncated,
+            "reason": "perturbed route search was truncated" if truncated else "",
+            "before_digest": _snapshot_digest(before),
+            "after_digest": _snapshot_digest(after),
+        }
+
+    started = time.monotonic()
+    door_tests = [run_test(item) for item in doors]
+    monster_tests = [run_test(item) for item in sampled_enemies]
+    inert_doors = [item for item in door_tests if item.get("changed") is False]
+    inert_monsters = [item for item in monster_tests if item.get("changed") is False]
+    inconclusive_count = sum(
+        1 for item in door_tests + monster_tests if bool(item.get("inconclusive"))
+    )
+    return {
+        "status": "fail" if inert_doors else "pass",
+        "baseline_top3": _stable_top_three(baseline),
+        "door_tests": door_tests,
+        "monster_tests": monster_tests,
+        "inert_doors": inert_doors,
+        "inert_monsters": inert_monsters,
+        "optional_enemy_count": len(optional_enemies),
+        "sampled_enemy_count": len(sampled_enemies),
+        "inconclusive_count": inconclusive_count,
+        "elapsed_seconds": round(time.monotonic() - started, 4),
+        "summary": (
+            f"Route sensitivity tested {len(door_tests)} doors and {len(monster_tests)} optional enemies; "
+            f"inert doors={len(inert_doors)}, inert sampled enemies={len(inert_monsters)}, "
+            f"inconclusive={inconclusive_count}."
+        ),
+    }
+
+
+def analyze_route_review(request: dict[str, Any]) -> dict[str, Any]:
+    report = analyze_route_balance(request)
+    report["sensitivity"] = analyze_route_sensitivity(request, report)
+    return report
+
+
 def compact_report(report: dict[str, Any]) -> dict[str, Any]:
     compact_groups: list[dict[str, Any]] = []
     ordered_groups = sorted(
@@ -936,6 +1232,7 @@ def compact_report(report: dict[str, Any]) -> dict[str, Any]:
         compact_groups.append({
             "target_region_id": group.get("target_region_id"),
             "target_bbox": group.get("target_bbox"),
+            "target_gem_coords": group.get("target_gem_coords", []),
             "target_gems": group.get("target_gems"),
             "resource_signature": selected.get("resource_signature") if isinstance(selected, dict) else None,
             "route_family_count": selected.get("route_family_count", 0) if isinstance(selected, dict) else 0,
@@ -943,6 +1240,20 @@ def compact_report(report: dict[str, Any]) -> dict[str, Any]:
             "passed": selected.get("passed", False) if isinstance(selected, dict) else False,
             "routes": routes,
         })
+    sensitivity = report.get("sensitivity")
+    compact_sensitivity = None
+    if isinstance(sensitivity, dict):
+        compact_sensitivity = {
+            "status": sensitivity.get("status"),
+            "door_tests": sensitivity.get("door_tests", []),
+            "monster_tests": sensitivity.get("monster_tests", []),
+            "inert_doors": sensitivity.get("inert_doors", []),
+            "inert_monsters": sensitivity.get("inert_monsters", []),
+            "optional_enemy_count": sensitivity.get("optional_enemy_count", 0),
+            "sampled_enemy_count": sensitivity.get("sampled_enemy_count", 0),
+            "inconclusive_count": sensitivity.get("inconclusive_count", 0),
+            "summary": sensitivity.get("summary", sensitivity.get("reason", "")),
+        }
     return {
         "status": report.get("status"),
         "balance_score": report.get("balance_score"),
@@ -954,6 +1265,7 @@ def compact_report(report: dict[str, Any]) -> dict[str, Any]:
         "omitted_group_count": max(0, len(ordered_groups) - len(compact_groups)),
         "graph": report.get("graph"),
         "search": report.get("search"),
+        "sensitivity": compact_sensitivity,
         "warnings": report.get("warnings", []),
         "summary": report.get("summary"),
     }
@@ -966,7 +1278,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--compact", action="store_true", help="Print only the top-three compact reviewer report.")
     args = parser.parse_args(argv)
     request = json.loads(args.input.read_text(encoding="utf-8"))
-    report = analyze_route_balance(request)
+    report = analyze_route_review(request)
     text = json.dumps(compact_report(report) if args.compact else report, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
