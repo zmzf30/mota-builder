@@ -1,6 +1,6 @@
 # Mota Builder
 
-基于 `mota-js`、Python 和 AI Agent 终端（必须安装并配置Agent Cli环境，默认使用并建议使用 Codex CLI，推荐不低于 GPT-5.5 xhigh 能力的模型；同时也支持通过 `--agent-backend opencode` 使用 OpenCode）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
+基于 `mota-js`、Python 和 AI Agent 终端（必须安装并配置 Agent CLI 环境，默认使用 Codex CLI，并沿用其默认模型和推理强度；同时也支持通过 `--agent-backend opencode` 使用 OpenCode）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
 
 mota-js 是 HTML5 魔塔样板，需要您clone https://github.com/ckcz123/mota-js 并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
 
@@ -197,8 +197,8 @@ python3 scripts/build_mota_tower.py \
 - `--parallel-floors --floor-concurrency 4`：并发生成楼层，速度更快；每层资源预算优先读取 `floor_progression_plan[].resource_budget`，只有规划缺失、格式错误或合计不等于整塔预算时才记录错误并回退整数均分。传统塔战斗审查按初始 HP，加上此前楼层平均可获得的红/蓝宝石攻防来估算当前层勇士能力。
 - `--agent-backend codex|opencode`：选择内部 LLM 调用后端；默认 `codex`。
 - `--max-attempts <n>`：每层最大尝试次数；默认 Codex 为 `4`，OpenCode 为 `6`。
-- `--model <model>`：指定后端模型。默认 Codex 会传 `--model gpt-5.5`；OpenCode 只有显式设置时才会传 `--model`，通常写成 `provider/model`。
-- `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认还会传 `model_reasoning_effort="xhigh"` 和 `service_tier="priority"`。
+- `--model <model>`：指定后端模型。Codex 和 OpenCode 默认都沿用各自 CLI 配置，只有显式设置时才会传 `--model`；OpenCode 通常写成 `provider/model`。
+- `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认仍会传 `service_tier="priority"`，推理强度沿用 Codex CLI 配置。
 - `--codex-arg <arg>`：额外传给 `codex exec` 的原始参数，可重复。
 - `--opencode-arg <arg>`：额外传给 `opencode run` 的原始参数，可重复。使用 OpenCode 时不会传 Codex 专用的 `model_reasoning_effort` 或 `service_tier`。
 - `--timeout <seconds>`：单次 agent 调用超时时间，默认 `1800` 秒（30 分钟）。

@@ -76,9 +76,9 @@ Prefer defaults unless the user gives a reason to change them.
 - Before floor generation, enemy-data generation runs its own projected-hero, floor-pool, and reviewer loop. Per-floor generation is staged: topology -> economy -> encounter. Economy places no doors or enemies; encounter jointly places doors, monsters, and specials. One final floor review follows encounter generation and routes repair to the earliest owning stage.
 - Browser playtest runs after each accepted floor by default using `playtest-mota-game`. Use `--skip-playtest` only when browser automation is unavailable or the user explicitly wants faster non-browser generation.
 - `--playtest-policy`: Defaults to `warn`, so playtest findings are reported but do not block generation. Use `fail` only when the user explicitly wants browser playtest issues to fail the pipeline.
-- `--model`: Defaults to `gpt-5.5` for all internal Codex calls. Override only if the user requests a specific model.
+- `--model`: Codex uses its configured default model unless the user requests a specific model.
 - `--profile`: Set only if the user requests a Codex profile.
-- `--config`: Defaults include `model_reasoning_effort="xhigh"` and `service_tier="priority"` for fast high-reasoning internal calls. Pass additional explicit overrides only when needed.
+- `--config`: The default only includes `service_tier="priority"`; reasoning effort follows the Codex CLI configuration. Pass additional explicit overrides only when needed.
 - `--codex-arg`: Pass through advanced raw Codex exec arguments only when necessary.
 - `--timeout`: Set for long full-tower runs or when the user asks for a time limit.
 - `--sandbox`: Keep `read-only` for planning. Use a broader sandbox only if later pipeline stages intentionally edit files.

@@ -83,9 +83,7 @@ DOOR_RESOURCE_KEYS = {"yellow_doors", "blue_doors", "red_doors"}
 SUPPORTED_FLOOR_SIZES = {9, 11, 13}
 DEFAULT_FLOOR_SIZE = 11
 MAX_FLOOR_CONCURRENCY = 4
-DEFAULT_CODEX_MODEL = "gpt-5.5"
 DEFAULT_CODEX_CONFIG = [
-    'model_reasoning_effort="xhigh"',
     'service_tier="priority"',
 ]
 AGENT_BACKENDS = ("codex", "opencode")
@@ -9569,7 +9567,7 @@ def self_test(repo_root: Path) -> int:
     assert [distribute_red_sea_limit("redGems", 42, 6, index) for index in range(6)] == [6, 6, 7, 7, 8, 8]
     codex_args = argparse.Namespace(
         codex_bin="codex",
-        model=DEFAULT_CODEX_MODEL,
+        model=None,
         profile=None,
         config=list(DEFAULT_CODEX_CONFIG),
         codex_arg=[],
@@ -9577,8 +9575,9 @@ def self_test(repo_root: Path) -> int:
         sandbox="read-only",
     )
     codex_cmd = build_codex_command(codex_args, Path("/tmp/schema.json"), Path("/tmp/output.json"))
-    assert codex_cmd[:4] == ["codex", "exec", "--model", DEFAULT_CODEX_MODEL]
-    assert 'model_reasoning_effort="xhigh"' in codex_cmd
+    assert codex_cmd[:2] == ["codex", "exec"]
+    assert "--model" not in codex_cmd
+    assert not any(config.startswith("model_reasoning_effort=") for config in codex_cmd)
     assert 'service_tier="priority"' in codex_cmd
     opencode_args = argparse.Namespace(
         opencode_bin="opencode",
@@ -9611,6 +9610,8 @@ def self_test(repo_root: Path) -> int:
     parsed_defaults = parse_args(["--self-test"])
     assert parsed_defaults.timeout == DEFAULT_AGENT_TIMEOUT_SECONDS
     assert parsed_defaults.max_attempts == DEFAULT_MAX_ATTEMPTS
+    assert parsed_defaults.model is None
+    assert not any(config.startswith("model_reasoning_effort=") for config in parsed_defaults.config)
     opencode_defaults = parse_args(["--self-test", "--agent-backend", "opencode"])
     assert opencode_defaults.max_attempts == OPENCODE_DEFAULT_MAX_ATTEMPTS
     explicit_opencode_attempts = parse_args(
@@ -10758,16 +10759,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument(
         "--model",
-        help=(
-            f"Model for internal calls. Codex defaults to {DEFAULT_CODEX_MODEL}; "
-            "OpenCode only receives --model when this is set explicitly."
-        ),
+        help="Model for internal calls. Both Codex and OpenCode use their configured default unless set explicitly.",
     )
     parser.add_argument("--profile", help="Optional Codex config profile.")
     parser.add_argument(
         "--config",
         action="append",
-        help="Extra codex exec --config key=value; repeatable. Codex defaults include xhigh reasoning and priority service tier.",
+        help="Extra codex exec --config key=value; repeatable. Codex defaults include priority service tier.",
     )
     parser.add_argument("--codex-arg", action="append", default=[], help="Extra raw codex exec argument; repeatable.")
     parser.add_argument("--opencode-bin", default="opencode")
@@ -10877,8 +10875,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     if args.enemy_design_count < 0:
         parser.error("--enemy-design-count must be non-negative")
     if args.agent_backend == "codex":
-        if args.model is None:
-            args.model = DEFAULT_CODEX_MODEL
         args.config = list(DEFAULT_CODEX_CONFIG) + (args.config or [])
     else:
         if args.profile:
