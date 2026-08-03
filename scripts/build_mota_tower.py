@@ -79,6 +79,25 @@ TRACKED_RESOURCES = [
     "greenPotions",
 ]
 DOOR_RESOURCE_KEYS = {"yellow_doors", "blue_doors", "red_doors"}
+RECOVERY_RESOURCE_TILE_IDS = {
+    "yellow_doors": "yellowDoor",
+    "blue_doors": "blueDoor",
+    "red_doors": "redDoor",
+    "yellow_keys": "yellowKey",
+    "blue_keys": "blueKey",
+    "red_keys": "redKey",
+    "pickaxes": "pickaxe",
+    "bombs": "bomb",
+    "centerFly": "centerFly",
+    "jumpShoes": "jumpShoes",
+    "redGems": "redGem",
+    "blueGems": "blueGem",
+    "greenGems": "greenGem",
+    "redPotions": "redPotion",
+    "bluePotions": "bluePotion",
+    "yellowPotions": "yellowPotion",
+    "greenPotions": "greenPotion",
+}
 
 SUPPORTED_FLOOR_SIZES = {9, 11, 13}
 DEFAULT_FLOOR_SIZE = 11
@@ -7081,6 +7100,9 @@ def select_final_floor_candidate(
     limits: dict[str, int | None],
     floor_policy: dict[str, Any] | None,
     floor_contract: dict[str, Any] | None,
+    floor_size: int,
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not candidates:
         raise PipelineError(f"MT{floor_index} has no complete candidates for final selection.")
@@ -7185,7 +7207,55 @@ def select_final_floor_candidate(
             ),
         }
         selector = "deterministic_fallback"
-    selected = by_id[str(agent_selection["selected_candidate_id"])]
+    requested_id = str(agent_selection["selected_candidate_id"])
+    requested = by_id[requested_id]
+    ordered_candidates = [requested] + [
+        candidate
+        for candidate in sorted(candidates, key=candidate_rank, reverse=True)
+        if str(candidate.get("candidate_id")) != requested_id
+    ]
+    selected: dict[str, Any] | None = None
+    deterministic_completion = False
+    completion_errors: list[str] = []
+    for candidate in ordered_candidates:
+        candidate_id = str(candidate.get("candidate_id"))
+        try:
+            completed_output, completed_delta, was_completed = complete_recovered_floor_output(
+                args,
+                brief,
+                floor_index,
+                floor_size,
+                maps,
+                enemys,
+                floor_policy,
+                floor_contract,
+                candidate.get("encounter_output", {}),
+            )
+        except PipelineError as exc:
+            completion_errors.append(f"{candidate_id}: {exc}")
+            continue
+        selected = core_clone(candidate)
+        selected["encounter_output"] = completed_output
+        selected["budget_delta"] = completed_delta
+        deterministic_completion = was_completed
+        if candidate_id != requested_id:
+            selector = "deterministic_complete_fallback"
+            agent_selection["summary"] = (
+                f"Requested candidate {requested_id} could not pass completeness validation; "
+                f"selected complete candidate {candidate_id}."
+            )
+        elif was_completed:
+            selector = f"{selector}+deterministic_completion"
+            agent_selection["summary"] = (
+                f"{agent_selection.get('summary', 'Selected the best available candidate.')} "
+                "The intermediate candidate was deterministically completed before acceptance."
+            )
+        break
+    if selected is None:
+        raise PipelineError(
+            f"MT{floor_index} has no candidate that can be completed safely: "
+            + " | ".join(completion_errors[:8])
+        )
     selected_id = str(selected["candidate_id"])
     selection = {
         "selected_candidate_id": selected_id,
@@ -7208,6 +7278,7 @@ def select_final_floor_candidate(
         "selected_candidate_id": selected_id,
         "candidate_count": len(candidates),
         "attempt": int(selected.get("attempt", 0)),
+        "deterministic_completion": deterministic_completion,
         "selection": selection,
         "selected_candidate_previous_review": selected.get("review", {}),
     }
@@ -8275,6 +8346,9 @@ def generate_floor_staged_with_retries(
                     limits,
                     floor_policy,
                     floor_contract,
+                    floor_size,
+                    maps,
+                    enemys,
                 )
                 topology_output = core_clone(selected_candidate["topology_output"])
                 economy_output = core_clone(selected_candidate["economy_output"])
@@ -8441,6 +8515,275 @@ def tile_code_for_id(maps: dict[str, Any], tile_id: str, fallback: int) -> int:
     return fallback
 
 
+def optional_tile_code_for_id(maps: dict[str, Any], tile_id: str) -> int | None:
+    for raw_code, entry in maps.items():
+        if not isinstance(entry, dict) or entry.get("id") != tile_id:
+            continue
+        try:
+            return int(raw_code)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def recovery_resource_key(entry: dict[str, Any] | None) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    if is_door_entry(entry):
+        keys = entry.get("doorInfo", {}).get("keys", {})
+        if "yellowKey" in keys:
+            return "yellow_doors"
+        if "blueKey" in keys:
+            return "blue_doors"
+        if "redKey" in keys:
+            return "red_doors"
+        return None
+    entry_id = str(entry.get("id", ""))
+    for key, tile_id in RECOVERY_RESOURCE_TILE_IDS.items():
+        if key not in DOOR_RESOURCE_KEYS and entry_id == tile_id:
+            return key
+    return None
+
+
+def recovery_enemy_codes(
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    floor_policy: dict[str, Any] | None,
+) -> list[int]:
+    requested = floor_policy.get("allowed_enemy_codes", []) if isinstance(floor_policy, dict) else []
+    raw_codes = requested if isinstance(requested, list) else []
+    if not raw_codes:
+        raw_codes = list(maps)
+    valid: list[int] = []
+    seen: set[int] = set()
+    for raw_code in raw_codes:
+        try:
+            code = int(raw_code)
+        except (TypeError, ValueError):
+            continue
+        if code in seen:
+            continue
+        entry = maps.get(str(code), {})
+        enemy_id = str(entry.get("id", ""))
+        enemy = enemys.get(enemy_id, {})
+        if not is_enemy_entry(entry) or not isinstance(enemy, dict):
+            continue
+        if policy_number(enemy.get("hp"), 0.0) <= 0 or policy_number(enemy.get("atk"), 0.0) <= 0:
+            continue
+        seen.add(code)
+        valid.append(code)
+
+    def safety_rank(code: int) -> tuple[int, float, int]:
+        enemy_id = str(maps.get(str(code), {}).get("id", ""))
+        enemy = enemys.get(enemy_id, {})
+        specials = set(special_list(enemy.get("special"))) if isinstance(enemy, dict) else set()
+        geometry_risk = int(bool(specials & {15, 18}))
+        special_risk = int(bool(specials))
+        return geometry_risk, special_risk, code
+
+    return sorted(valid, key=safety_rank)
+
+
+def recovery_completion_issues(
+    floor_output: dict[str, Any],
+    expected_floor_id: str,
+    floor_size: int,
+    brief: dict[str, Any],
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+) -> tuple[list[str], dict[str, int]]:
+    issues, delta = local_floor_review(
+        floor_output, expected_floor_id, floor_size, brief, maps, enemys, floor_policy
+    )
+    if isinstance(floor_contract, dict):
+        for key, limit in floor_limits_from_contract(floor_contract).items():
+            if limit is not None and delta.get(key, 0) != limit:
+                issues.append(f"{key} exact floor quota mismatch: actual {delta.get(key, 0)} != required {limit}.")
+    return issues, delta
+
+
+def complete_recovered_floor_output(
+    args: argparse.Namespace,
+    brief: dict[str, Any],
+    floor_index: int,
+    floor_size: int,
+    maps: dict[str, Any],
+    enemys: dict[str, Any],
+    floor_policy: dict[str, Any] | None,
+    floor_contract: dict[str, Any] | None,
+    floor_output: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, int], bool]:
+    expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
+    initial_issues, initial_delta = recovery_completion_issues(
+        floor_output,
+        expected_floor_id,
+        floor_size,
+        brief,
+        maps,
+        enemys,
+        floor_policy,
+        floor_contract,
+    )
+    if not initial_issues:
+        return core_clone(floor_output), initial_delta, False
+
+    completed = core_clone(floor_output)
+    floor = completed.get("floor")
+    if not isinstance(floor, dict):
+        raise PipelineError(f"{expected_floor_id} recovery candidate has no floor object.")
+    width, height, matrix = floor_dimensions(floor)
+    if width != floor_size or height != floor_size:
+        raise PipelineError(
+            f"{expected_floor_id} recovery candidate is {width}x{height}; expected {floor_size}x{floor_size}."
+        )
+
+    existing_enemy_count = 0
+    resource_coords: dict[str, list[tuple[int, int]]] = {key: [] for key in TRACKED_RESOURCES}
+    for y, row in enumerate(matrix):
+        for x, code in enumerate(row):
+            entry = maps.get(str(code), {})
+            if is_enemy_entry(entry):
+                existing_enemy_count += 1
+                matrix[y][x] = 0
+                continue
+            key = recovery_resource_key(entry)
+            if key:
+                resource_coords[key].append((x, y))
+
+    contract_limits = floor_limits_from_contract(floor_contract) if isinstance(floor_contract, dict) else {}
+    targets: dict[str, int] = {}
+    for key in TRACKED_RESOURCES:
+        limit = contract_limits.get(key)
+        targets[key] = len(resource_coords[key]) if limit is None else max(int(limit), 0)
+        while len(resource_coords[key]) > targets[key]:
+            x, y = resource_coords[key].pop()
+            matrix[y][x] = 0
+
+    if not isinstance(floor_contract, dict):
+        if sum(targets[key] for key in DOOR_RESOURCE_KEYS) == 0:
+            targets["yellow_doors"] = 1
+        if sum(targets[key] for key in ("yellow_keys", "blue_keys", "red_keys")) == 0:
+            targets["yellow_keys"] = 1
+        reward_keys = [
+            "pickaxes", "bombs", "centerFly", "jumpShoes", "redGems", "blueGems", "greenGems",
+            "redPotions", "bluePotions", "yellowPotions", "greenPotions",
+        ]
+        if sum(targets[key] for key in reward_keys) < 2:
+            targets["redGems"] = max(targets["redGems"], 1)
+            targets["blueGems"] = max(targets["blueGems"], 1)
+
+    missing_resources: list[str] = []
+    for key in TRACKED_RESOURCES:
+        missing_resources.extend([key] * max(targets[key] - len(resource_coords[key]), 0))
+
+    enemy_codes = recovery_enemy_codes(maps, enemys, floor_policy)
+    if not enemy_codes:
+        raise PipelineError(f"{expected_floor_id} has no usable enemy tile codes for deterministic completion.")
+    min_enemies = monster_policy_int(brief, "enemy_count_min_per_floor")
+    max_enemies = monster_policy_int(brief, "enemy_count_max_per_floor")
+    if min_enemies > max_enemies:
+        min_enemies, max_enemies = max_enemies, min_enemies
+    target_enemies = min(max(existing_enemy_count, min_enemies), max_enemies)
+
+    pressure_coords = pressure_annotation_coords(completed)
+    empty_coords = [
+        (x, y)
+        for y, row in enumerate(matrix)
+        for x, code in enumerate(row)
+        if code == 0
+    ]
+    empty_coords.sort(key=lambda coord: (coord not in pressure_coords, coord[1], coord[0]))
+    if len(empty_coords) < target_enemies + len(missing_resources):
+        raise PipelineError(
+            f"{expected_floor_id} recovery candidate has {len(empty_coords)} empty cells, but needs "
+            f"{target_enemies} enemies and {len(missing_resources)} tracked resources."
+        )
+
+    selected_enemy_cells: list[tuple[int, int]] = []
+    no_adjacent = monster_policy_bool(brief, "no_adjacent_enemies")
+    if no_adjacent:
+        parity_counts = {
+            parity: sum(1 for x, y in empty_coords if (x + y) % 2 == parity)
+            for parity in (0, 1)
+        }
+        parity_order = sorted((0, 1), key=lambda parity: parity_counts[parity], reverse=True)
+        ordered_enemy_candidates = [
+            coord
+            for parity in parity_order
+            for coord in empty_coords
+            if (coord[0] + coord[1]) % 2 == parity
+        ]
+        selected_set: set[tuple[int, int]] = set()
+        for coord in ordered_enemy_candidates:
+            x, y = coord
+            if any((x + dx, y + dy) in selected_set for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                continue
+            selected_enemy_cells.append(coord)
+            selected_set.add(coord)
+            if len(selected_enemy_cells) >= target_enemies:
+                break
+    else:
+        selected_enemy_cells = empty_coords[:target_enemies]
+    if len(selected_enemy_cells) < target_enemies:
+        raise PipelineError(
+            f"{expected_floor_id} recovery topology supports only {len(selected_enemy_cells)} legal enemy cells; "
+            f"requires {target_enemies}."
+        )
+
+    reserved_enemy_cells = set(selected_enemy_cells)
+    available_resource_cells = [coord for coord in empty_coords if coord not in reserved_enemy_cells]
+    resource_destinations = available_resource_cells[: len(missing_resources)]
+    if len(resource_destinations) != len(missing_resources):
+        raise PipelineError(f"{expected_floor_id} does not have enough cells for tracked resources.")
+    for key, (x, y) in zip(missing_resources, resource_destinations):
+        tile_id = RECOVERY_RESOURCE_TILE_IDS[key]
+        code = optional_tile_code_for_id(maps, tile_id)
+        if code is None:
+            raise PipelineError(f"{expected_floor_id} cannot place recovery tile {tile_id!r}; code is unavailable.")
+        matrix[y][x] = code
+    for index, (x, y) in enumerate(selected_enemy_cells):
+        matrix[y][x] = enemy_codes[index % len(enemy_codes)]
+
+    floor["map"] = matrix
+    completed["summary"] = (
+        f"{completed.get('summary', '')} Deterministically completed from an intermediate artifact after "
+        "generation/review exhaustion."
+    ).strip()[:1600]
+    annotations = completed.setdefault("annotations", [])
+    if not isinstance(annotations, list):
+        annotations = []
+        completed["annotations"] = annotations
+    annotations.append(
+        {
+            "stage": "integration",
+            "kind": "fallback",
+            "label": "Deterministic intermediate completion",
+            "coordinates": [[x, y] for x, y in selected_enemy_cells[:20]],
+            "description": "Filled exact tracked-resource quotas and minimum legal enemy pressure before acceptance.",
+            "tags": ["fallback", "completed", "manual-review"],
+            "data": "",
+        }
+    )
+    final_issues, final_delta = recovery_completion_issues(
+        completed,
+        expected_floor_id,
+        floor_size,
+        brief,
+        maps,
+        enemys,
+        floor_policy,
+        floor_contract,
+    )
+    if final_issues:
+        raise PipelineError(
+            f"{expected_floor_id} deterministic completion did not pass hard validation: "
+            + " | ".join(final_issues[:8])
+        )
+    return completed, final_delta, True
+
+
 def fallback_floor_output(
     args: argparse.Namespace,
     floor_index: int,
@@ -8604,44 +8947,68 @@ def recover_floor_result_from_artifacts(
     maps: dict[str, Any],
     enemys: dict[str, Any],
     floor_policy: dict[str, Any],
+    floor_contract: dict[str, Any] | None,
     reason: str,
 ) -> dict[str, Any]:
     recovery_issues = [reason]
     floor_output: dict[str, Any] | None = None
     recovered_from: str | None = None
+    completion_applied = False
     for _, path in recovery_floor_candidates(args.out_dir, floor_index):
         try:
             candidate = load_json_object(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, PipelineError) as exc:
             recovery_issues.append(f"{path.name} could not be loaded: {exc}")
             continue
-        floor_output = coerce_recovered_floor_output(args, floor_index, floor_size, brief, candidate)
-        if floor_output is not None:
-            recovered_from = path.name
-            break
+        candidate_output = coerce_recovered_floor_output(args, floor_index, floor_size, brief, candidate)
+        if candidate_output is None:
+            recovery_issues.append(f"{path.name} was not a structurally usable floor artifact.")
+            continue
+        try:
+            floor_output, delta, completion_applied = complete_recovered_floor_output(
+                args,
+                brief,
+                floor_index,
+                floor_size,
+                maps,
+                enemys,
+                floor_policy,
+                floor_contract,
+                candidate_output,
+            )
+        except PipelineError as exc:
+            recovery_issues.append(f"{path.name} could not be completed: {exc}")
+            continue
+        recovered_from = path.name
+        break
     if floor_output is None:
-        floor_output = fallback_floor_output(args, floor_index, floor_size, maps, reason)
+        fallback_output = fallback_floor_output(args, floor_index, floor_size, maps, reason)
+        floor_output, delta, completion_applied = complete_recovered_floor_output(
+            args,
+            brief,
+            floor_index,
+            floor_size,
+            maps,
+            enemys,
+            floor_policy,
+            floor_contract,
+            fallback_output,
+        )
         recovered_from = "generated fallback"
-
-    expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
-    try:
-        local_issues, delta = local_floor_review(floor_output, expected_floor_id, floor_size, brief, maps, enemys, floor_policy)
-    except PipelineError as exc:
-        local_issues = [str(exc)]
-        delta = normalize_delta(None)
-    if local_issues:
-        recovery_issues.extend(local_issues[:8])
     delta = normalize_delta(delta)
     review = forced_accept_review(floor_index, args.max_attempts, "integration", delta, recovery_issues)
     review["summary"] = (
-        f"Forced accept from {recovered_from}; generation will continue and this floor needs manual editing."
+        f"Recovered a complete floor from {recovered_from}; hard completeness validation passed"
+        + (" after deterministic completion." if completion_applied else ".")
     )
+    review["deterministic_completion"] = completion_applied
     return {
         "floor_index": floor_index,
         "floor_output": floor_output,
         "review": review,
         "budget_delta": delta,
         "recovered_from": recovered_from,
+        "deterministic_completion": completion_applied,
     }
 
 
@@ -8656,6 +9023,7 @@ def recover_all_floor_results(
     floor_enemy_policies: list[dict[str, Any]],
     reason: str,
 ) -> tuple[dict[str, int], list[dict[str, Any]], list[dict[str, Any]]]:
+    contracts = build_floor_contracts(args, brief, floor_count, floor_size, limits)
     used = empty_budget()
     accepted_summaries: list[dict[str, Any]] = []
     accepted_floors: list[dict[str, Any]] = []
@@ -8669,11 +9037,28 @@ def recover_all_floor_results(
             maps,
             enemys,
             floor_policy,
+            contracts[floor_index],
             reason,
         )
-        accepted_floor = result["floor_output"]
+        accepted_floor, delta, deterministic_completion = complete_recovered_floor_output(
+            args,
+            brief,
+            floor_index,
+            floor_size,
+            maps,
+            enemys,
+            floor_policy,
+            contracts[floor_index],
+            result["floor_output"],
+        )
         accepted_review = result["review"]
-        delta = result["budget_delta"]
+        if deterministic_completion:
+            accepted_review["deterministic_completion"] = True
+            accepted_review["summary"] = (
+                str(accepted_review.get("summary", ""))
+                + " | Deterministically completed before writing the game project."
+            )[:1600]
+            accepted_review["budget_delta"] = delta
         used = add_budget(used, delta)
         write_accepted_floor_artifacts(args, floor_index, accepted_floor, accepted_review, limits, used)
         accepted_floors.append(accepted_floor)
@@ -8738,11 +9123,28 @@ def run_sequential_floor_generation(
                 maps,
                 enemys,
                 floor_policy,
+                contracts[floor_index],
                 f"sequential floor generation failed: {exc}",
             )
-        accepted_floor = result["floor_output"]
+        accepted_floor, delta, deterministic_completion = complete_recovered_floor_output(
+            args,
+            brief,
+            floor_index,
+            floor_size,
+            maps,
+            enemys,
+            floor_policy,
+            contracts[floor_index],
+            result["floor_output"],
+        )
         accepted_review = result["review"]
-        delta = result["budget_delta"]
+        if deterministic_completion:
+            accepted_review["deterministic_completion"] = True
+            accepted_review["summary"] = (
+                str(accepted_review.get("summary", ""))
+                + " | Deterministically completed before writing the game project."
+            )[:1600]
+            accepted_review["budget_delta"] = delta
         used = add_budget(used, delta)
         write_accepted_floor_artifacts(args, floor_index, accepted_floor, accepted_review, limits, used)
         accepted_floors.append(accepted_floor)
@@ -8858,6 +9260,7 @@ def run_parallel_floor_generation(
                     maps,
                     enemys,
                     floor_policy,
+                    contracts[floor_index],
                     f"parallel worker failed: {exc}",
                 )
                 print(f"{floor_label(floor_index)}并发生成出错，已恢复中间产物并继续：{exc}")
@@ -8889,10 +9292,10 @@ def run_parallel_floor_generation(
                 maps,
                 enemys,
                 floor_policy,
+                contracts[floor_index],
                 "parallel worker did not return a result.",
             )
         result = results[floor_index]
-        accepted_floor = result["floor_output"]
         accepted_review = result["review"]
         forced_accept = is_forced_accept_review(accepted_review)
         floor_policy = build_runtime_floor_policy(
@@ -8903,6 +9306,23 @@ def run_parallel_floor_generation(
             maps,
             parallel_hero_override_for_style(brief, floor_index, floor_count),
         )
+        accepted_floor, delta, deterministic_completion = complete_recovered_floor_output(
+            args,
+            brief,
+            floor_index,
+            floor_size,
+            maps,
+            enemys,
+            floor_policy,
+            contracts[floor_index],
+            result["floor_output"],
+        )
+        if deterministic_completion:
+            accepted_review["deterministic_completion"] = True
+            accepted_review["summary"] = (
+                str(accepted_review.get("summary", ""))
+                + " | Deterministically completed before writing the game project."
+            )[:1600]
         expected_floor_id = f"{args.floor_prefix}{floor_index + args.floor_number_offset}"
         try:
             local_issues, delta = local_floor_review(
@@ -8917,7 +9337,7 @@ def run_parallel_floor_generation(
             local_issues.extend(budget_issues(delta, limits, used))
         except PipelineError as exc:
             local_issues = [str(exc)]
-            delta = normalize_delta(accepted_review.get("budget_delta"))
+            delta = normalize_delta(accepted_review.get("budget_delta")) or delta
         if accepted_review.get("status") != "pass":
             local_issues.append("parallel worker review did not pass.")
         if local_issues:
@@ -10262,6 +10682,77 @@ def self_test(repo_root: Path) -> int:
     assert all(policy["allowed_enemy_ids"] for policy in floor_policies)
     assert all("enemy_combat_metrics" in policy for policy in floor_policies)
     assert all("difficulty_summary" in policy for policy in floor_policies)
+    recovery_args = argparse.Namespace(floor_prefix="MT", floor_number_offset=0)
+    recovery_contract = {
+        "floor_index": 0,
+        "resource_limits": {key: sample_delta.get(key, 0) for key in TRACKED_RESOURCES},
+    }
+    economy_recovery_output = core_clone(sample_floor_output)
+    economy_recovery_output["summary"] = "economy-only recovery candidate"
+    for y, row in enumerate(economy_recovery_output["floor"]["map"]):
+        for x, code in enumerate(row):
+            entry = maps.get(str(code), {})
+            if is_enemy_entry(entry) or is_door_entry(entry):
+                economy_recovery_output["floor"]["map"][y][x] = 0
+    incomplete_issues, _ = recovery_completion_issues(
+        economy_recovery_output,
+        "MT0",
+        9,
+        sample_brief,
+        maps,
+        enemys,
+        floor_policies[0],
+        recovery_contract,
+    )
+    assert any("at least 4 enemies" in issue for issue in incomplete_issues)
+    completed_economy, completed_delta, economy_was_completed = complete_recovered_floor_output(
+        recovery_args,
+        sample_brief,
+        0,
+        9,
+        maps,
+        enemys,
+        floor_policies[0],
+        recovery_contract,
+        economy_recovery_output,
+    )
+    assert economy_was_completed is True
+    assert completed_delta == sample_delta
+    completed_issues, _ = recovery_completion_issues(
+        completed_economy,
+        "MT0",
+        9,
+        sample_brief,
+        maps,
+        enemys,
+        floor_policies[0],
+        recovery_contract,
+    )
+    assert completed_issues == []
+    completed_topology, topology_delta, topology_was_completed = complete_recovered_floor_output(
+        recovery_args,
+        sample_brief,
+        0,
+        9,
+        maps,
+        enemys,
+        floor_policies[0],
+        recovery_contract,
+        topology_floor_output,
+    )
+    assert topology_was_completed is True
+    assert topology_delta == sample_delta
+    topology_completion_issues, _ = recovery_completion_issues(
+        completed_topology,
+        "MT0",
+        9,
+        sample_brief,
+        maps,
+        enemys,
+        floor_policies[0],
+        recovery_contract,
+    )
+    assert topology_completion_issues == []
     projection_brief = core_clone(sample_brief)
     projection_brief["global_settings"] = {
         "initial_hero": {"hp": 500, "atk": 10, "def": 10},
