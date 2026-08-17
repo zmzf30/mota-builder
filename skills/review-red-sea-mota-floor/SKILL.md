@@ -40,6 +40,8 @@ Review exactly one supplied red-sea stage. The orchestrator owns deterministic v
 - Reject filler density, pressure concentrated on one side, clean unpriced corridors, naked reward piles, cosmetic routes, and strict route dominance.
 - Require different regions to emphasize different mixes of door commitment, combat thresholds, specials, tools, and protected rewards.
 - Judge monster thresholds against the supplied projected hero; red-sea style never implies stronger numeric stats by itself.
+- Only zone and repulse roles require geometry-specific placement evidence; ordinary role metadata is a
+  numeric candidate contract and must not be rejected for lacking a placement annotation.
 - Door/enemy/special issues return to `encounter`; resource placement issues return to `economy`; structural issues return to `topology`.
 
 ## Red-Sea Quality

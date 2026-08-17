@@ -27,6 +27,9 @@ Turn the red-sea economy map's pressure intent into doors, monsters, and support
 - Distribute purposeful pressure across sparse regions before adding more to dense regions.
 - Preserve regional variety: different regions may emphasize doors, combat thresholds, specials, tools, or protected rewards.
 - Every door and enemy must affect route cost, reward access, a threshold, a shortcut, or supported special pressure.
+- Treat the supplied enemy role metadata as authoritative. Do not add map-placement responsibilities for
+  high_attack, balanced, magic, high_hp, gem_gate, or strong roles; only zone and repulse may receive
+  geometry-specific placement annotations.
 - Never create density with meaningless filler and never move dispersed resources to balance density.
 
 ## Zone And Repulse

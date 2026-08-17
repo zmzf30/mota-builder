@@ -27,6 +27,9 @@ Turn the economy map's pressure intent into a coherent set of doors, monsters, a
 - Blue and red doors need stronger compensation than yellow-door baseline routes.
 - Every enemy must tax a route, guard value, enforce a threshold, control a shortcut, or create supported special pressure.
 - Use the projected hero state to distinguish endurance, attack, defense, balanced, and optional-pressure roles.
+- Treat the supplied enemy role metadata as authoritative. Do not add map-placement responsibilities for
+  high_attack, balanced, magic, high_hp, gem_gate, or strong roles; only zone and repulse may receive
+  geometry-specific placement annotations.
 - Avoid filler and avoid one route that is both cheaper and richer than all alternatives.
 - Realize pressure intent where possible; if an intent is intentionally replaced, preserve its route purpose and compensation.
 

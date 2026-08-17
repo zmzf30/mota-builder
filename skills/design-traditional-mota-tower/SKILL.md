@@ -44,7 +44,8 @@ When `Real few-shot tower progression input` is present, it was extracted from a
   - `18`: 阻击
 - Each monster has at most one special ability unless the user explicitly changes this rule.
 - At least half of all actively used monster types must have no special ability.
-- Each floor may use at most `monster_types_per_floor`. If unspecified, set it to `9`.
+- Each floor candidate pool should use 10-12 role slots by default. Keep `monster_types_per_floor` as
+  the concrete placement ceiling, and use `candidate_types_per_floor` for the role-catalog ceiling.
 - Traditional floors place 18-28 enemy tiles by default; red-sea floors place 22-33. Explicit user settings remain authoritative.
 - Always set the initial monster book to exactly one: `global_settings.initial_hero.tools.book=1`. Do not ask the user to choose it.
 - Monster tiers should overlap between adjacent floors: a stronger subset of the previous floor's monster pool may appear on the next floor, but weak lower-tier enemies should not keep reappearing on higher floors.
@@ -143,7 +144,21 @@ Use this shape:
     "allowed_specials": [1, 2, 3, 15, 18],
     "max_specials_per_monster": 1,
     "min_no_special_ratio": 0.5,
-    "monster_types_per_floor": 9,
+    "monster_types_per_floor": 12,
+    "candidate_types_per_floor": 12,
+    "role_slots": {
+      "high_attack": {"min": 1, "max": 1},
+      "balanced": {"min": 2, "max": 3},
+      "magic": {"min": 1, "max": 1},
+      "zone": {"min": 1, "max": 1},
+      "repulse": {"min": 1, "max": 1},
+      "high_hp": {"min": 1, "max": 1},
+      "gem_gate": {"min": 1, "max": 1},
+      "strong": {"min": 2, "max": 3}
+    },
+    "cross_floor_roles": ["high_attack", "magic", "zone", "repulse", "strong"],
+    "cross_floor_max_span": 2,
+    "cross_floor_attack_multiplier": 1.3,
     "enemy_count_min_per_floor": 18,
     "enemy_count_max_per_floor": 28,
     "floor_overlap_ratio": 0.7,
@@ -186,7 +201,7 @@ Use this shape:
 
 Every `floor_progression_plan` entry must contain all fields of `resource_budget`. For every numeric whole-tower limit, per-floor values must be non-negative integers whose sum exactly matches that limit. Allocate by floor role and intended access pressure instead of evenly dividing by default.
 
-Set `status` to `needs_input` if required information is too vague to proceed. In that case, fill `questions` with concise questions. Defaults are `floor_size = 11`, `tower_style = traditional`, `monster_types_per_floor = 9`, traditional enemy count 18-28, red-sea enemy count 22-33, and initial monster book 1.
+Set `status` to `needs_input` if required information is too vague to proceed. In that case, fill `questions` with concise questions. Defaults are `floor_size = 11`, `tower_style = traditional`, `monster_types_per_floor = 12`, a 10-12 type candidate catalog, traditional enemy count 18-28, red-sea enemy count 22-33, and initial monster book 1.
 
 ## Boundary
 

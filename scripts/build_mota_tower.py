@@ -109,8 +109,8 @@ AGENT_BACKENDS = ("codex", "opencode")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
-CACHE_VERSION = "token-cache-v18-route-sensitivity"
-PROMPT_PAYLOAD_VERSION = "compact-prompts-v16-route-sensitivity"
+CACHE_VERSION = "token-cache-v19-enemy-role-contract"
+PROMPT_PAYLOAD_VERSION = "compact-prompts-v17-enemy-role-contract"
 RED_SEA_PROMPT_BUNDLE_VERSION = "red-sea-prompts-v1"
 
 ROUTE_BALANCE_CONFIG = {
@@ -165,9 +165,59 @@ DIRECT_RESOURCE_ITEM_IDS = set(RESOURCE_WEIGHT_BY_ID) | TOOL_ITEM_IDS | {
     "sword0", "sword1", "sword2", "sword3", "sword4", "sword5",
     "shield0", "shield1", "shield2", "shield3", "shield4", "shield5",
 }
+ENEMY_ROLE_ORDER = (
+    "high_attack",
+    "balanced",
+    "magic",
+    "zone",
+    "repulse",
+    "high_hp",
+    "gem_gate",
+    "strong",
+)
+DEFAULT_ENEMY_ROLE_SLOTS = {
+    "high_attack": {"min": 1, "max": 1},
+    "balanced": {"min": 2, "max": 3},
+    "magic": {"min": 1, "max": 1},
+    "zone": {"min": 1, "max": 1},
+    "repulse": {"min": 1, "max": 1},
+    "high_hp": {"min": 1, "max": 1},
+    "gem_gate": {"min": 1, "max": 1},
+    "strong": {"min": 2, "max": 3},
+}
+DEFAULT_CROSS_FLOOR_ROLES = ["high_attack", "magic", "zone", "repulse", "strong"]
+DEFAULT_CROSS_FLOOR_MAX_SPAN = 2
+DEFAULT_CROSS_FLOOR_ATTACK_MULTIPLIER = 1.3
+ENEMY_ROLE_ALIASES = {
+    "high attack": "high_attack",
+    "high attack pressure": "high_attack",
+    "high_attack": "high_attack",
+    "balanced": "balanced",
+    "balanced combat": "balanced",
+    "magic": "magic",
+    "magic attack": "magic",
+    "magic attack specialist": "magic",
+    "zone": "zone",
+    "zone pressure specialist": "zone",
+    "repulse": "repulse",
+    "repulse pressure specialist": "repulse",
+    "high hp": "high_hp",
+    "high hp endurance": "high_hp",
+    "tank": "high_hp",
+    "gem gate": "gem_gate",
+    "defense threshold": "gem_gate",
+    "solid defense threshold": "gem_gate",
+    "strong": "strong",
+}
 DEFAULT_MONSTER_POLICY = {
     "enemy_count_min_per_floor": 18,
     "enemy_count_max_per_floor": 28,
+    "monster_types_per_floor": 12,
+    "candidate_types_per_floor": 12,
+    "role_slots": {role: dict(bounds) for role, bounds in DEFAULT_ENEMY_ROLE_SLOTS.items()},
+    "cross_floor_roles": list(DEFAULT_CROSS_FLOOR_ROLES),
+    "cross_floor_max_span": DEFAULT_CROSS_FLOOR_MAX_SPAN,
+    "cross_floor_attack_multiplier": DEFAULT_CROSS_FLOOR_ATTACK_MULTIPLIER,
     "floor_overlap_ratio": 0.7,
     "special_damage_red_potion_min": 0.5,
     "special_damage_red_potion_max": 1.0,
@@ -241,7 +291,7 @@ STYLE_LAYOUT_PROFILES: dict[str, dict[str, Any]] = {
 }
 DEFAULT_WALL_RATIO_MIN = float(STYLE_LAYOUT_PROFILES[DEFAULT_TOWER_STYLE]["wall_ratio_min"])
 DEFAULT_WALL_RATIO_MAX = float(STYLE_LAYOUT_PROFILES[DEFAULT_TOWER_STYLE]["wall_ratio_max"])
-DEFAULT_MONSTER_TYPES_PER_FLOOR = 9
+DEFAULT_MONSTER_TYPES_PER_FLOOR = 12
 DEFAULT_ENEMY_DESIGN_COUNT = 0
 HIGH_VALUE_POCKET_THRESHOLD = 3.0
 DEFAULT_HIGH_VALUE_POCKET_THRESHOLD = HIGH_VALUE_POCKET_THRESHOLD
@@ -253,6 +303,7 @@ PRESSURE_ANNOTATION_KINDS = {
     "special_candidate",
     "mini_boss_candidate",
 }
+
 STAGE_LABELS = {
     "topology": "地图结构",
     "economy": "资源和路线",
@@ -489,6 +540,11 @@ BRIEF_SCHEMA: dict[str, Any] = {
                 "max_specials_per_monster": {"type": ["integer", "null"]},
                 "min_no_special_ratio": {"type": ["number", "null"]},
                 "monster_types_per_floor": {"type": ["integer", "null"]},
+                "candidate_types_per_floor": {"type": ["integer", "null"]},
+                "role_slots": {"type": ["object", "null"]},
+                "cross_floor_roles": schema_array({"type": "string"}),
+                "cross_floor_max_span": {"type": ["integer", "null"]},
+                "cross_floor_attack_multiplier": {"type": ["number", "null"]},
                 "enemy_count_min_per_floor": {"type": ["integer", "null"]},
                 "enemy_count_max_per_floor": {"type": ["integer", "null"]},
                 "floor_overlap_ratio": {"type": ["number", "null"]},
@@ -658,6 +714,9 @@ ENEMY_DESIGN_UPDATE_SCHEMA = strict_schema_object(
         "money": {"type": "integer"},
         "exp": {"type": "integer"},
         "point": {"type": "integer"},
+        "role": {"type": ["string", "null"]},
+        "cross_floor": {"type": ["boolean", "null"]},
+        "strong_variant": {"type": ["boolean", "null"]},
         "specials": schema_array({"type": "integer"}),
         "value": {"type": ["integer", "number", "null"]},
         "zone": {"type": ["integer", "number", "null"]},
@@ -2817,6 +2876,118 @@ def enemy_role_hint(enemy: dict[str, Any]) -> str:
     return "balanced combat"
 
 
+def canonical_enemy_role(raw_role: Any, enemy: dict[str, Any] | None = None) -> str:
+    """Normalize design metadata while keeping legacy stat-only tables usable."""
+    text = str(raw_role or "").strip().lower().replace("-", " ").replace("_", " ")
+    if text in ENEMY_ROLE_ALIASES:
+        return ENEMY_ROLE_ALIASES[text]
+    enemy = enemy or {}
+    specials = set(special_list(enemy.get("special")))
+    if 2 in specials:
+        return "magic"
+    if 15 in specials:
+        return "zone"
+    if 18 in specials:
+        return "repulse"
+    if 1 in specials and not text:
+        return "high_attack"
+    hp = policy_number(enemy.get("hp"), 0.0)
+    atk = policy_number(enemy.get("atk"), 0.0)
+    defense = policy_number(enemy.get("def"), 0.0)
+    if hp >= max(atk * 8.0, 1000.0):
+        return "high_hp"
+    if atk >= max(defense * 4.0, 45.0):
+        return "high_attack"
+    if defense >= max(atk * 0.75, 20.0):
+        return "gem_gate"
+    return "balanced"
+
+
+def enemy_role_slots(brief: dict[str, Any]) -> dict[str, dict[str, int]]:
+    monster_policy = brief.get("monster_policy", {})
+    if not isinstance(monster_policy, dict):
+        return {}
+    raw_slots = monster_policy.get("role_slots")
+    if not isinstance(raw_slots, dict):
+        configured_limit = int(monster_policy.get("candidate_types_per_floor") or monster_policy.get("monster_types_per_floor") or 9)
+        if configured_limit < 10:
+            return {}
+        raw_slots = DEFAULT_ENEMY_ROLE_SLOTS
+    slots: dict[str, dict[str, int]] = {}
+    for role in ENEMY_ROLE_ORDER:
+        raw = raw_slots.get(role, {})
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            minimum = maximum = max(int(raw), 0)
+        elif isinstance(raw, dict):
+            minimum = max(int(raw.get("min", 0) or 0), 0)
+            maximum = max(int(raw.get("max", minimum) or minimum), minimum)
+        else:
+            continue
+        slots[role] = {"min": minimum, "max": maximum}
+    return slots
+
+
+def enemy_candidate_type_limit(brief: dict[str, Any]) -> int:
+    monster_policy = brief.get("monster_policy", {})
+    if not isinstance(monster_policy, dict):
+        return DEFAULT_MONSTER_TYPES_PER_FLOOR
+    raw = monster_policy.get("candidate_types_per_floor")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return max(int(raw), 1)
+    raw = monster_policy.get("monster_types_per_floor")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return max(int(raw), 1)
+    return DEFAULT_MONSTER_TYPES_PER_FLOOR
+
+
+def cross_floor_policy(brief: dict[str, Any]) -> tuple[set[str], int, float]:
+    monster_policy = brief.get("monster_policy", {})
+    if not isinstance(monster_policy, dict):
+        monster_policy = {}
+    raw_roles = monster_policy.get("cross_floor_roles", DEFAULT_CROSS_FLOOR_ROLES)
+    if not isinstance(raw_roles, list):
+        raw_roles = DEFAULT_CROSS_FLOOR_ROLES
+    roles = {
+        canonical_enemy_role(item)
+        for item in raw_roles
+        if isinstance(item, str) and canonical_enemy_role(item) in ENEMY_ROLE_ORDER
+    }
+    max_span = monster_policy.get("cross_floor_max_span", DEFAULT_CROSS_FLOOR_MAX_SPAN)
+    multiplier = monster_policy.get("cross_floor_attack_multiplier", DEFAULT_CROSS_FLOOR_ATTACK_MULTIPLIER)
+    if isinstance(max_span, bool) or not isinstance(max_span, (int, float)):
+        max_span = DEFAULT_CROSS_FLOOR_MAX_SPAN
+    if isinstance(multiplier, bool) or not isinstance(multiplier, (int, float)):
+        multiplier = DEFAULT_CROSS_FLOOR_ATTACK_MULTIPLIER
+    return roles, max(int(max_span), 1), max(float(multiplier), 1.0)
+
+
+def role_slot_targets(brief: dict[str, Any], limit: int) -> dict[str, int] | None:
+    slots = enemy_role_slots(brief)
+    if not slots:
+        return None
+    minimum_total = sum(item["min"] for item in slots.values())
+    if limit < minimum_total:
+        return None
+    targets = {role: item["min"] for role, item in slots.items()}
+    remaining = limit - minimum_total
+    for role in ("balanced", "strong"):
+        if remaining <= 0:
+            break
+        available = slots.get(role, {}).get("max", 0) - targets.get(role, 0)
+        add = min(max(available, 0), remaining)
+        targets[role] = targets.get(role, 0) + add
+        remaining -= add
+    if remaining > 0:
+        for role in ENEMY_ROLE_ORDER:
+            if remaining <= 0:
+                break
+            available = slots.get(role, {}).get("max", 0) - targets.get(role, 0)
+            add = min(max(available, 0), remaining)
+            targets[role] = targets.get(role, 0) + add
+            remaining -= add
+    return {role: count for role, count in targets.items() if count > 0}
+
+
 def build_enemy_candidates(
     maps: dict[str, Any],
     enemys: dict[str, Any],
@@ -2837,6 +3008,7 @@ def build_enemy_candidates(
         for item in enemy_design.get("designed_enemy_ids", [])
         if isinstance(item, (str, int))
     }
+    roles_by_id = enemy_design.get("roles_by_id", {}) if isinstance(enemy_design.get("roles_by_id"), dict) else {}
     candidates: list[dict[str, Any]] = []
     for code, entry in sorted(maps.items(), key=lambda item: int(item[0])):
         entry_id = entry.get("id")
@@ -2875,7 +3047,22 @@ def build_enemy_candidates(
                 ),
                 "score": enemy_strength_score(enemy),
                 "special": specials,
-                "role": enemy_role_hint(enemy),
+                "role": canonical_enemy_role(
+                    roles_by_id.get(str(entry_id), {}).get("role")
+                    if isinstance(roles_by_id.get(str(entry_id)), dict)
+                    else None,
+                    enemy,
+                ),
+                "cross_floor": bool(
+                    roles_by_id.get(str(entry_id), {}).get("cross_floor")
+                    if isinstance(roles_by_id.get(str(entry_id)), dict)
+                    else False
+                ),
+                "strong_variant": bool(
+                    roles_by_id.get(str(entry_id), {}).get("strong_variant")
+                    if isinstance(roles_by_id.get(str(entry_id)), dict)
+                    else False
+                ),
                 "fallback_added": False,
             }
         )
@@ -3117,9 +3304,208 @@ def _enemy_floor_role(
 
 
 def _role_family(role: str) -> str:
-    if role in {"tank", "high attack", "balanced", "defense threshold"}:
-        return role
-    return "special"
+    role = canonical_enemy_role(role)
+    return "special" if role in {"magic", "zone", "repulse"} else role
+
+
+def enemy_role_contract_error(
+    candidate: dict[str, Any],
+    role: str,
+    hero_bands: dict[str, Any],
+) -> float:
+    """Return a role-specific fit error; numeric_score is intentionally not used."""
+    hero = hero_bands.get("target", hero_bands) if isinstance(hero_bands, dict) else {}
+    completion = hero_bands.get("completion", hero) if isinstance(hero_bands, dict) else hero
+    a = max(policy_number(hero.get("atk"), 1.0), 1.0)
+    d = max(policy_number(hero.get("def"), 1.0), 1.0)
+    ac = max(policy_number(completion.get("atk"), a), a)
+    dc = max(policy_number(completion.get("def"), d), d)
+    atk = policy_number(candidate.get("atk"), 0.0)
+    defense = policy_number(candidate.get("def"), 0.0)
+    hp = policy_number(candidate.get("hp"), 0.0)
+
+    def interval_error(value: float, low: float, high: float) -> float:
+        if value < low:
+            return (low - value) / max(low, 1.0)
+        if value > high:
+            return (value - high) / max(high, 1.0)
+        return 0.0
+
+    if role == "high_attack":
+        return (
+            interval_error(atk / a, 5.0, 7.0)
+            + interval_error(defense / max(atk, 1.0), 0.0, 0.1)
+            + interval_error(hp / max(atk, 1.0), 0.6, 1.2)
+        )
+    if role == "balanced":
+        target = 1.8 * max(a, d)
+        return (
+            interval_error(atk / max(target, 1.0), 0.9, 1.1)
+            + interval_error(defense / max(atk, 1.0), 0.3, 0.4)
+            + interval_error(hp / max(atk, 1.0), 2.5, 3.5)
+        )
+    if role == "magic":
+        return (
+            interval_error(atk / a, 0.7, 0.9)
+            + interval_error(defense / d, 0.5, 0.7)
+            + interval_error(hp / a, 3.0, 6.0)
+        )
+    if role in {"zone", "repulse"}:
+        target = 3.0 * max(a, d)
+        atk_low, atk_high = (0.85, 0.95) if role == "repulse" else (0.9, 1.1)
+        return (
+            interval_error(atk / max(target, 1.0), atk_low, atk_high)
+            + interval_error(defense / max(atk, 1.0), 0.3, 0.4)
+            + interval_error(hp / a, 4.25 if role == "repulse" else 5.0, 7.6 if role == "repulse" else 8.0)
+        )
+    if role == "high_hp":
+        target = 1.5 * max(a, d)
+        return (
+            interval_error(atk / max(target, 1.0), 0.9, 1.1)
+            + interval_error(defense / max(atk, 1.0), 0.45, 0.55)
+            + interval_error(hp / a, 9.0, 12.0)
+        )
+    if role == "gem_gate":
+        return (
+            interval_error(defense, max(ac - 6.0, 0.0), ac)
+            + max(1.5 - atk / max(defense, 1.0), 0.0)
+            + interval_error(hp / a, 0.8, 1.2)
+        )
+    if role == "strong":
+        return (
+            interval_error(atk / ac, 3.0, 4.0)
+            + interval_error(defense / dc, 0.6, 0.8)
+            + interval_error(hp / a, 4.0, 7.0)
+        )
+    return 10.0
+
+
+def build_role_slot_floor_policies(
+    floor_count: int,
+    candidates: list[dict[str, Any]],
+    enemys: dict[str, Any],
+    brief: dict[str, Any],
+    hero_projection: list[dict[str, Any]],
+    max_types: int,
+) -> list[dict[str, Any]]:
+    """Select explicit role slots and apply the two-floor carry rule."""
+    red_potion = red_potion_value(brief)
+    role_targets = role_slot_targets(brief, max_types) or {}
+    _cross_roles, max_span, cross_multiplier = cross_floor_policy(brief)
+    analyses: list[list[dict[str, Any]]] = []
+    for floor_index in range(floor_count):
+        hero_bands = hero_projection[floor_index]
+        target_hero = hero_bands.get("target", {})
+        floor_analysis: list[dict[str, Any]] = []
+        for candidate in candidates:
+            role = canonical_enemy_role(candidate.get("role"), enemys.get(candidate["id"], {}))
+            floor_analysis.append(
+                {
+                    **candidate,
+                    "role": role,
+                    "combat": enemy_floor_combat_metrics(enemys[candidate["id"]], target_hero, red_potion),
+                    "contract_error": round(enemy_role_contract_error(candidate, role, hero_bands), 6),
+                }
+            )
+        analyses.append(floor_analysis)
+
+    policies: list[dict[str, Any]] = []
+    previous_ids: list[str] = []
+    consecutive_span: dict[str, int] = {}
+    seen_enemy_ids: set[str] = set()
+    for floor_index, floor_analysis in enumerate(analyses):
+        hero_bands = hero_projection[floor_index]
+        target_hero = hero_bands.get("target", {})
+        # A monster carried from floor N-1 into floor N must survive the
+        # completion-state defense expected on floor N.
+        carry_completion_def = policy_number(hero_bands.get("completion", {}).get("def"), 0.0)
+        previous_set = set(previous_ids)
+        by_role: dict[str, list[dict[str, Any]]] = {role: [] for role in ENEMY_ROLE_ORDER}
+        for item in floor_analysis:
+            by_role.setdefault(item["role"], []).append(item)
+
+        selected: list[dict[str, Any]] = []
+        selected_ids: set[str] = set()
+
+        def eligible(item: dict[str, Any], role: str) -> bool:
+            enemy_id = item["id"]
+            if enemy_id in selected_ids:
+                return False
+            if consecutive_span.get(enemy_id, 0) >= max_span:
+                return False
+            if role == "strong" and enemy_id in previous_set:
+                return False
+            if enemy_id in previous_set and policy_number(item.get("atk"), 0.0) < carry_completion_def * cross_multiplier:
+                return False
+            return True
+
+        for role in ENEMY_ROLE_ORDER:
+            target_count = role_targets.get(role, 0)
+            if target_count <= 0:
+                continue
+            pool = [
+                item
+                for item in by_role.get(role, [])
+                if item["id"] not in selected_ids and eligible(item, role)
+            ]
+            pool.sort(
+                key=lambda item: (
+                    item["contract_error"],
+                    0 if item["id"] not in previous_set else 1,
+                    item["id"],
+                )
+            )
+            for item in pool[:target_count]:
+                item = dict(item)
+                selected.append(item)
+                selected_ids.add(item["id"])
+
+        difficulties = [item["combat"]["difficulty_score"] for item in selected if item["combat"].get("killable")]
+        raw_scores = [item["numeric_score"] for item in selected]
+        carried_ids = [item["id"] for item in selected if item["id"] in previous_set]
+        debut_ids = [item["id"] for item in selected if item["id"] not in seen_enemy_ids]
+        cross_ids = [item["id"] for item in selected if item["id"] in previous_set]
+        role_counts = {role: sum(1 for item in selected if item["role"] == role) for role in ENEMY_ROLE_ORDER}
+        policies.append(
+            {
+                "floor_index": floor_index,
+                "allowed_enemy_ids": [item["id"] for item in selected],
+                "allowed_enemy_codes": [item["code"] for item in selected],
+                "enemy_role_hints": {item["id"]: item["role"] for item in selected},
+                "enemy_role_families": {item["id"]: _role_family(item["role"]) for item in selected},
+                "enemy_combat_metrics": {item["id"]: item["combat"] for item in selected},
+                "enemy_raw_strength": {item["id"]: round(float(item["numeric_score"]), 3) for item in selected},
+                "enemy_role_contract_errors": {item["id"]: item["contract_error"] for item in selected},
+                "role_slot_targets": role_targets,
+                "role_slot_counts": role_counts,
+                "estimated_hero_bands": hero_bands,
+                "difficulty_target": round(_quantile(difficulties, 0.4) if difficulties else 999.0, 3),
+                "difficulty_summary": {
+                    "min": round(min(difficulties), 3) if difficulties else None,
+                    "median": round(_quantile(difficulties, 0.5), 3) if difficulties else None,
+                    "max": round(max(difficulties), 3) if difficulties else None,
+                    "raw_strength_median": round(_quantile(raw_scores, 0.5), 3) if raw_scores else None,
+                },
+                "carried_enemy_ids": carried_ids,
+                "cross_floor_enemy_ids": cross_ids,
+                "carry_min_difficulty": 0.0,
+                "debut_enemy_ids": debut_ids,
+                "debut_min_atk_def_sum": round(
+                    policy_number(target_hero.get("atk"), 0.0) + policy_number(target_hero.get("def"), 0.0), 3
+                )
+                if tower_style(brief) == "red_sea"
+                else None,
+                "fallback_no_special_enemy_ids": [],
+            }
+        )
+        next_span: dict[str, int] = {}
+        for item in selected:
+            enemy_id = item["id"]
+            next_span[enemy_id] = consecutive_span.get(enemy_id, 0) + 1 if enemy_id in previous_set else 1
+        consecutive_span = next_span
+        previous_ids = [item["id"] for item in selected]
+        seen_enemy_ids.update(previous_ids)
+    return policies
 
 
 def build_floor_enemy_policies(
@@ -3142,6 +3528,17 @@ def build_floor_enemy_policies(
             }
             for index in range(floor_count)
         ]
+
+    role_limit = enemy_candidate_type_limit(brief)
+    if role_slot_targets(brief, role_limit):
+        return build_role_slot_floor_policies(
+            floor_count,
+            candidates,
+            enemys,
+            brief,
+            hero_projection,
+            role_limit,
+        )
 
     monster_policy = brief.get("monster_policy", {})
     if not isinstance(monster_policy, dict):
@@ -5421,7 +5818,7 @@ def build_enemy_design_prompt(
 ) -> str:
     monster_policy = brief.get("monster_policy", {}) if isinstance(brief.get("monster_policy"), dict) else {}
     allowed_specials = monster_policy.get("allowed_specials", [1, 2, 3, 15, 18])
-    max_types = int(monster_policy.get("monster_types_per_floor") or 9)
+    max_types = enemy_candidate_type_limit(brief)
     slot_lines = enemy_design_slot_lines(maps, enemys)
     configured_count = int(getattr(args, "enemy_design_count", DEFAULT_ENEMY_DESIGN_COUNT) or 0)
     if configured_count > 0:
@@ -5434,6 +5831,11 @@ def build_enemy_design_prompt(
         "floor_size": floor_size,
         "allowed_specials": allowed_specials,
         "max_specials_per_monster": monster_policy.get("max_specials_per_monster", 1),
+        "candidate_types_per_floor": max_types,
+        "role_slots": enemy_role_slots(brief) or DEFAULT_ENEMY_ROLE_SLOTS,
+        "cross_floor_roles": sorted(cross_floor_policy(brief)[0]),
+        "cross_floor_max_span": cross_floor_policy(brief)[1],
+        "cross_floor_attack_multiplier": cross_floor_policy(brief)[2],
         "target_updated_enemy_slots": target_updates,
         "red_potion_hp": red_potion_value(brief),
         "special_damage_red_potion_range": [
@@ -5466,12 +5868,30 @@ def build_enemy_design_prompt(
         Requirements:
         - Update as many existing enemy slots as requested by target_updated_enemy_slots. If this
           equals the available slot count, rewrite every available enemy slot.
-        - A later floor-generation stage may use only some of these enemies; the purpose is to give
-          encounter stage enough choices across weak, medium, strong, and special-pressure roles.
-        - Build a clear weak-to-strong tier ladder across the complete table. Later enemies need not be
-          greater in every attribute, but later raw-strength tiers must exist for later floor selection.
-        - Provide global role diversity across the table: high-HP, high-ATK, balanced, defense-threshold,
-          and allowed special-pressure options. No individual floor candidate pool must contain every role.
+        - Assign every update one canonical role: high_attack, balanced, magic, zone, repulse, high_hp,
+          gem_gate, or strong. The role is semantic metadata for candidate selection, not a map-placement
+          instruction. Only zone and repulse may carry geometry-specific map responsibility.
+        - Build the requested role slots per floor: high_attack=1, balanced=2-3, magic=1, zone=1,
+          repulse=1, high_hp=1, gem_gate=1, strong=2-3. The candidate pool may contain 10-12 types;
+          the encounter stage may place a smaller concrete subset.
+        - Use these exact stat contracts, relative to the supplied projected hero bands. Interpret A/D as
+          target hero ATK/DEF and Ac/Dc as completion ATK/DEF:
+          high_attack: ATK=5-7A, DEF<=0.1*ATK, HP=0.6-1.2*ATK;
+          balanced: ATK=1.8*max(A,D), DEF=0.3-0.4*ATK, HP=2.5-3.5*ATK;
+          magic: ATK=0.7-0.9A, DEF=0.5-0.7D, HP=3-6A, special 2;
+          zone: ATK=3*max(A,D), DEF=0.3-0.4*ATK, HP=5-8A, special 15;
+          repulse: 0.85-0.95 of the paired zone stats, special 18;
+          high_hp: ATK=1.5*max(A,D), DEF=0.45-0.55*ATK, HP=9-12A;
+          gem_gate: DEF=Ac-3, ATK>=1.5*DEF, HP=0.8-1.2A;
+          strong: ATK=3-4*Ac, DEF=0.6-0.8*Dc, HP=4-7A, normally no special.
+        - Except for magic, never set ATK below the current floor target hero DEF. Preserve the stated
+          ratios by increasing ATK when this lower bound conflicts with a ratio.
+        - Mark cross_floor=true only for high_attack, magic, zone, repulse, or strong when the candidate
+          satisfies ATK >= next-floor completion DEF * 1.3. No monster may be reused for three consecutive
+          floors, and an enemy from the immediately previous floor cannot fill the current strong slot.
+        - Zone and repulse damage must remain within the supplied red-potion range. Set range=1 and do not
+          add placement duties for ordinary, magic, high_hp, gem_gate, or strong roles.
+        - Keep numeric_score as an auxiliary ordering value only; do not use it as the core difficulty target.
         - A candidate is allowed to exceed the current floor's projected hero attack or otherwise be
           temporarily unbeatable. Do not lower or remove a tier merely to make every candidate killable.
         - For red-sea towers, scale later stat tiers against the full confirmed gems and potions available
@@ -5582,6 +6002,7 @@ def apply_enemy_design_updates(
     applied_ids: list[str] = []
     warnings: list[str] = []
     seen: set[str] = set()
+    roles_by_id: dict[str, dict[str, Any]] = {}
     for update in updates:
         if not isinstance(update, dict):
             warnings.append("ignored non-object enemy update")
@@ -5605,6 +6026,17 @@ def apply_enemy_design_updates(
         enemy["money"] = normalized_enemy_update_int(update, "money", 0)
         enemy["exp"] = normalized_enemy_update_int(update, "exp", 0)
         enemy["point"] = normalized_enemy_update_int(update, "point", 0)
+
+        raw_role = update.get("role")
+        role = canonical_enemy_role(raw_role, enemy) if raw_role else canonical_enemy_role(None, enemy)
+        if role not in ENEMY_ROLE_ORDER:
+            warnings.append(f"ignored invalid role for {enemy_id}: {raw_role!r}")
+            role = canonical_enemy_role(None, enemy)
+        roles_by_id[enemy_id] = {
+            "role": role,
+            "cross_floor": bool(update.get("cross_floor")) if update.get("cross_floor") is not None else role in DEFAULT_CROSS_FLOOR_ROLES,
+            "strong_variant": bool(update.get("strong_variant")) if update.get("strong_variant") is not None else role == "strong",
+        }
 
         specials = normalized_enemy_specials(update, allowed_specials, max_specials)
         enemy["special"] = 0 if not specials else (specials[0] if len(specials) == 1 else specials)
@@ -5639,6 +6071,7 @@ def apply_enemy_design_updates(
 
     if not applied_ids:
         raise PipelineError("enemy design agent did not update any known enemy ids.")
+    design["roles_by_id"] = roles_by_id
     return enemys, applied_ids, warnings
 
 
@@ -5656,6 +6089,193 @@ def enemy_table_review_issue(
         "reason": reason,
         "required_change": required_change,
     }
+
+
+def role_contract_review_issues(
+    floor_policies: list[dict[str, Any]],
+    enemys: dict[str, Any],
+    brief: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Validate explicit role slots without treating numeric_score as difficulty."""
+    limit = enemy_candidate_type_limit(brief)
+    expected_slots = role_slot_targets(brief, limit)
+    if not expected_slots:
+        return []
+    hero_projection = project_hero_bands_by_floor(brief, len(floor_policies))
+    _cross_roles, max_span, cross_multiplier = cross_floor_policy(brief)
+    issues: list[dict[str, Any]] = []
+    previous_ids: set[str] = set()
+    consecutive_span: dict[str, int] = {}
+    blue_potion = potion_red_equiv_value(brief, "bluePotion") * red_potion_value(brief)
+
+    for floor_index, policy in enumerate(floor_policies):
+        ids = [str(value) for value in policy.get("allowed_enemy_ids", [])]
+        roles = policy.get("enemy_role_hints", {}) if isinstance(policy.get("enemy_role_hints"), dict) else {}
+        hero_bands = policy.get("estimated_hero_bands") or (
+            hero_projection[floor_index] if floor_index < len(hero_projection) else {}
+        )
+        target = hero_bands.get("target", {}) if isinstance(hero_bands, dict) else {}
+        completion = hero_bands.get("completion", target) if isinstance(hero_bands, dict) else target
+        counts = {
+            role: sum(
+                1
+                for enemy_id in ids
+                if canonical_enemy_role(roles.get(enemy_id), enemys.get(enemy_id, {})) == role
+            )
+            for role in ENEMY_ROLE_ORDER
+        }
+        slot_config = enemy_role_slots(brief)
+        missing_or_excess: list[str] = []
+        for role, target_count in expected_slots.items():
+            actual = counts.get(role, 0)
+            limits = slot_config.get(role, {"min": target_count, "max": target_count})
+            if actual < limits["min"] or actual > limits["max"]:
+                missing_or_excess.append(f"{role}={actual} (expected {limits['min']}-{limits['max']})")
+        if missing_or_excess:
+            issues.append(
+                enemy_table_review_issue(
+                    "fail",
+                    f"Floor {floor_index} role slots mismatch: {', '.join(missing_or_excess)}.",
+                    "Select the configured high_attack/balanced/magic/zone/repulse/high_hp/gem_gate/strong roles per floor.",
+                    [floor_index],
+                    ids,
+                )
+            )
+
+        # For a previous-floor monster reused on this floor, this floor is the
+        # "next layer" in the carry rule.
+        carry_completion_def = policy_number(completion.get("def"), 0.0)
+        for enemy_id in ids:
+            enemy = enemys.get(enemy_id, {})
+            role = canonical_enemy_role(roles.get(enemy_id), enemy)
+            candidate = {**enemy, "role": role}
+            carried = enemy_id in previous_ids
+            contract_error = enemy_role_contract_error(candidate, role, hero_bands)
+            if not carried and contract_error > 0.25:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Floor {floor_index} enemy {enemy_id} violates {role} stat contract (error {contract_error:.2f}).",
+                        f"Adjust {role} stats to the user-defined ATK/DEF/HP ratios for this floor's hero bands.",
+                        [floor_index],
+                        [enemy_id],
+                    )
+                )
+            actual_specials = set(special_list(enemy.get("special")))
+            required_special = {"magic": 2, "zone": 15, "repulse": 18}.get(role)
+            if required_special is not None and required_special not in actual_specials:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Enemy {enemy_id} is role {role} but lacks special {required_special}.",
+                        f"Assign the required special ability to the {role} role.",
+                        [floor_index],
+                        [enemy_id],
+                    )
+                )
+            if role in {"balanced", "high_hp", "gem_gate", "strong"} and actual_specials:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Enemy {enemy_id} in ordinary role {role} has unsupported specials {sorted(actual_specials)}.",
+                        "Remove specials from balanced, high_hp, gem_gate, and strong roles.",
+                        [floor_index],
+                        [enemy_id],
+                    )
+                )
+            if role == "high_attack" and actual_specials - {1}:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"High-attack enemy {enemy_id} has unsupported specials {sorted(actual_specials - {1})}.",
+                        "Keep high_attack ordinary or give it only first strike (special 1).",
+                        [floor_index],
+                        [enemy_id],
+                    )
+                )
+            attack = policy_number(enemy.get("atk"), 0.0)
+            if role != "magic" and attack < policy_number(target.get("def"), 0.0):
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Floor {floor_index} enemy {enemy_id} has ATK {attack:g} below projected hero DEF {policy_number(target.get('def'), 0.0):g}.",
+                        "Raise non-magic ATK to at least target hero DEF; magic is the only exception.",
+                        [floor_index],
+                        [enemy_id],
+                    )
+                )
+            if enemy_id in previous_ids and consecutive_span.get(enemy_id, 0) >= max_span:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Enemy {enemy_id} appears on three consecutive floors ending at floor {floor_index}.",
+                        "Break the carry chain after at most two consecutive floors.",
+                        [max(0, floor_index - 2), floor_index],
+                        [enemy_id],
+                    )
+                )
+            if role == "strong" and enemy_id in previous_ids:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Enemy {enemy_id} from the previous floor occupies the strong slot on floor {floor_index}.",
+                        "Use a newly introduced strong variant for the current floor.",
+                        [max(0, floor_index - 1), floor_index],
+                        [enemy_id],
+                    )
+                )
+            if enemy_id in previous_ids and attack < carry_completion_def * cross_multiplier:
+                issues.append(
+                    enemy_table_review_issue(
+                        "fail",
+                        f"Cross-floor enemy {enemy_id} has ATK {attack:g}, below current completion DEF {carry_completion_def:g} * {cross_multiplier:g}.",
+                        "Raise ATK or stop carrying this enemy into the next floor.",
+                        [max(0, floor_index - 1), floor_index],
+                        [enemy_id],
+                    )
+                )
+            if role == "gem_gate" and not carried:
+                target_metrics = enemy_floor_combat_metrics(enemy, target, red_potion_value(brief))
+                completion_metrics = enemy_floor_combat_metrics(enemy, completion, red_potion_value(brief))
+                if target_metrics.get("killable") is True or completion_metrics.get("killable") is not True:
+                    issues.append(
+                        enemy_table_review_issue(
+                            "fail",
+                            f"Gem-gate enemy {enemy_id} must be unkillable at target stats and killable at completion stats.",
+                            "Set DEF close to completion ATK-3 and verify both target/completion battle states.",
+                            [floor_index],
+                            [enemy_id],
+                        )
+                    )
+            if role == "strong" and not carried:
+                completion_metrics = enemy_floor_combat_metrics(enemy, completion, red_potion_value(brief))
+                loss = completion_metrics.get("battle_loss")
+                if completion_metrics.get("killable") is not True or not isinstance(loss, (int, float)):
+                    issues.append(
+                        enemy_table_review_issue(
+                            "fail",
+                            f"Strong enemy {enemy_id} is not killable in the completion state.",
+                            "Tune the strong enemy so completion-state battle simulation can calibrate its blue-potion cost.",
+                            [floor_index],
+                            [enemy_id],
+                        )
+                    )
+                elif blue_potion > 0 and not 2.5 * blue_potion <= float(loss) <= 3.5 * blue_potion:
+                    issues.append(
+                        enemy_table_review_issue(
+                            "fail",
+                            f"Strong enemy {enemy_id} completion loss {float(loss):g} is not about three blue potions ({blue_potion:g} each).",
+                            "Adjust HP/ATK/DEF until completion-state loss is 2.5-3.5 blue-potion values.",
+                            [floor_index],
+                            [enemy_id],
+                        )
+                    )
+        next_span: dict[str, int] = {}
+        for enemy_id in ids:
+            next_span[enemy_id] = consecutive_span.get(enemy_id, 0) + 1 if enemy_id in previous_ids else 1
+        consecutive_span = next_span
+        previous_ids = set(ids)
+    return issues
 
 
 def local_enemy_table_review(
@@ -5794,6 +6414,7 @@ def local_enemy_table_review(
                     sorted(all_active_ids - set(no_special)),
                 )
             )
+    issues.extend(role_contract_review_issues(floor_policies, enemys, brief))
     status = "fail" if any(issue["severity"] == "fail" for issue in issues) else "pass"
     return {
         "status": status,
@@ -5842,6 +6463,12 @@ def prepare_runtime_enemy_table(
     analysis_path = args.out_dir / "enemy_floor_analysis.json"
     hero_projection = project_hero_bands_by_floor(brief, floor_count)
 
+    def design_metadata(design_data: dict[str, Any], ids: list[str]) -> dict[str, Any]:
+        return {
+            "designed_enemy_ids": ids,
+            "roles_by_id": design_data.get("roles_by_id", {}) if isinstance(design_data, dict) else {},
+        }
+
     if args.resume_existing and generated_path.exists():
         runtime_enemys = load_json_object(generated_path.read_text(encoding="utf-8"))
         design = load_json_object(design_path.read_text(encoding="utf-8")) if design_path.exists() else {}
@@ -5859,12 +6486,13 @@ def prepare_runtime_enemy_table(
             brief["enemy_design"] = {
                 "summary": design.get("summary", "Loaded existing generated enemy table."),
                 "designed_enemy_ids": applied_ids,
+                "roles_by_id": design.get("roles_by_id", {}),
                 "warnings": design.get("warnings", []),
                 "review_status": existing_review.get("status"),
                 "forced_accept": bool(existing_review.get("forced_accept")),
             }
             analysis_brief = core_clone(brief)
-            analysis_brief["enemy_design"] = {"designed_enemy_ids": applied_ids}
+            analysis_brief["enemy_design"] = design_metadata(design, applied_ids)
             if floor_plan_path.exists():
                 existing_plan = load_json_object(floor_plan_path.read_text(encoding="utf-8"))
                 args.enemy_floor_policies = existing_plan.get("floors", [])
@@ -5898,7 +6526,7 @@ def prepare_runtime_enemy_table(
             write_json(generated_path, cached_enemys)
             write_json(hero_projection_path, {"floors": hero_projection})
             analysis_brief = core_clone(brief)
-            analysis_brief["enemy_design"] = {"designed_enemy_ids": applied_ids}
+            analysis_brief["enemy_design"] = design_metadata(cached_design, applied_ids)
             floor_policies = (
                 cached_plan.get("floors", [])
                 if isinstance(cached_plan, dict) and isinstance(cached_plan.get("floors"), list)
@@ -5912,6 +6540,7 @@ def prepare_runtime_enemy_table(
             brief["enemy_design"] = {
                 "summary": cached_design.get("summary", "Loaded cached generated enemy table."),
                 "designed_enemy_ids": applied_ids,
+                "roles_by_id": cached_design.get("roles_by_id", {}),
                 "warnings": cached_design.get("warnings", []),
                 "cache_key": cache_key,
                 "review_status": review.get("status"),
@@ -5955,7 +6584,7 @@ def prepare_runtime_enemy_table(
             design["designed_enemy_ids"] = applied_ids
             design["warnings"] = warnings
             analysis_brief = core_clone(brief)
-            analysis_brief["enemy_design"] = {"designed_enemy_ids": applied_ids}
+            analysis_brief["enemy_design"] = design_metadata(design, applied_ids)
             floor_policies = build_floor_enemy_policies(
                 floor_count, maps, runtime_enemys, analysis_brief
             )
@@ -6025,6 +6654,7 @@ def prepare_runtime_enemy_table(
     brief["enemy_design"] = {
         "summary": design.get("summary", ""),
         "designed_enemy_ids": applied_ids,
+        "roles_by_id": design.get("roles_by_id", {}),
         "warnings": warnings,
         "cache_key": cache_key,
         "review_status": review.get("status"),
@@ -9394,6 +10024,11 @@ def apply_advanced_policy_overrides(args: argparse.Namespace, brief: dict[str, A
         monster_policy = {}
         brief["monster_policy"] = monster_policy
     monster_policy["monster_types_per_floor"] = int(args.monster_types_per_floor)
+    monster_policy["candidate_types_per_floor"] = max(int(args.monster_types_per_floor), 10)
+    monster_policy.setdefault("role_slots", core_clone(DEFAULT_ENEMY_ROLE_SLOTS))
+    monster_policy.setdefault("cross_floor_roles", list(DEFAULT_CROSS_FLOOR_ROLES))
+    monster_policy.setdefault("cross_floor_max_span", DEFAULT_CROSS_FLOOR_MAX_SPAN)
+    monster_policy.setdefault("cross_floor_attack_multiplier", DEFAULT_CROSS_FLOOR_ATTACK_MULTIPLIER)
     monster_policy["max_specials_per_monster"] = int(args.max_specials_per_monster)
     monster_policy["floor_overlap_ratio"] = float(args.floor_overlap_ratio)
     monster_policy["special_damage_red_potion_min"] = float(args.special_damage_red_potion_min)
@@ -9759,7 +10394,7 @@ def self_test(repo_root: Path) -> int:
     assert monster_policy_int({"tower_style": "traditional"}, "enemy_count_max_per_floor") == 28
     assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_min_per_floor") == 24
     assert monster_policy_int({"tower_style": "red_sea"}, "enemy_count_max_per_floor") == 32
-    assert DEFAULT_MONSTER_TYPES_PER_FLOOR == 9
+    assert DEFAULT_MONSTER_TYPES_PER_FLOOR == 12
     style_probe_args = argparse.Namespace(tower_style="red_sea", wall_ratio_min=None, wall_ratio_max=None)
     style_probe_brief = {"global_settings": {"initial_hero": {"tools": {"book": 0}}}}
     apply_tower_style(style_probe_args, style_probe_brief)

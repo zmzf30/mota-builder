@@ -40,6 +40,8 @@ Review exactly one supplied stage. The orchestrator owns generation, determinist
 - Every monster must tax a route, guard value, enforce a threshold, control a shortcut, or create supported special pressure.
 - Reject filler, naked rewards, all-cost routes, cosmetic alternatives, and a route that is both cheaper and richer than all others.
 - Judge combat thresholds against the projected hero supplied in `current_floor_policy`.
+- Only zone and repulse roles require geometry-specific placement evidence; ordinary role metadata is a
+  numeric candidate contract and must not be rejected for lacking a placement annotation.
 - Door/enemy/special placement issues return to `encounter`; economy placement issues return to `economy`; structural issues return to `topology`.
 
 ## Traditional Quality
