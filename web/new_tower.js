@@ -39,6 +39,7 @@ let enemyCountTouched = false;
 const agentMaxAttemptDefaults = {
   codex: 4,
   opencode: 6,
+  copilot: 4,
 };
 
 const styleWallDefaults = {

@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from typing import Optional
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts import mota_builder_app
 
@@ -48,6 +48,31 @@ class UiInstanceIsolationTest(unittest.TestCase):
 
 
 class WebBuildCommandTest(unittest.TestCase):
+    def test_copilot_form_is_forwarded_to_build_command(self) -> None:
+        normalized = mota_builder_app.normalize_form({"agentBackend": "copilot"})
+        command = mota_builder_app.build_command(
+            Path("build/test-output"), Path("build/test-idea.txt"), normalized, "idea"
+        )
+        self.assertEqual(normalized["agentBackend"], "copilot")
+        self.assertEqual(normalized["maxAttempts"], mota_builder_app.DEFAULT_MAX_ATTEMPTS)
+        self.assertEqual(command[command.index("--agent-backend") + 1], "copilot")
+        self.assertEqual(command[command.index("--max-attempts") + 1], "4")
+
+    def test_unknown_backend_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Agent"):
+            mota_builder_app.normalize_form({"agentBackend": "unknown"})
+
+    def test_resume_can_switch_to_copilot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir)
+            original = mota_builder_app.normalize_form({"floors": 2})
+            mota_builder_app.write_json(run_dir / "request.json", {"form": original})
+            current = mota_builder_app.normalize_form({"agentBackend": "copilot"})
+            resumed = mota_builder_app.build_resume_command_form(run_dir, current)
+            self.assertTrue(resumed["resumeExisting"])
+            self.assertEqual(resumed["floors"], 2)
+            self.assertEqual(resumed["agentBackend"], "copilot")
+
     def test_new_run_does_not_reuse_generation_cache(self) -> None:
         command = mota_builder_app.build_command(
             Path("/tmp/output"), Path("/tmp/idea.txt"), {}, "idea"
@@ -63,6 +88,25 @@ class WebBuildCommandTest(unittest.TestCase):
         )
         self.assertIn("--resume-existing", command)
         self.assertNotIn("--no-generation-cache", command)
+
+
+class CopilotRunProcessTest(unittest.TestCase):
+    def test_discovers_only_copilot_process_for_requested_run(self) -> None:
+        run_dir = mota_builder_app.RUNS_DIR / "copilot-test-run"
+        output_dir = mota_builder_app.output_dir_for(run_dir)
+        processes = Mock(stdout="\n".join([
+            f"200 200 copilot --log-dir {output_dir}/.copilot-logs",
+            "201 201 copilot --log-dir /other-run/.copilot-logs",
+            f"202 202 tail -f {run_dir}/run.log",
+            f"100 100 copilot --log-dir {output_dir}/.copilot-logs",
+        ]))
+        with patch.object(mota_builder_app.subprocess, "run", return_value=processes), \
+                patch.object(mota_builder_app.os, "getpid", return_value=100), \
+                patch.object(mota_builder_app.os, "getpgrp", return_value=100):
+            self.assertEqual(
+                mota_builder_app.discover_run_process_groups("copilot-test-run", run_dir),
+                {200},
+            )
 
 
 class TowerStyleDefaultsTest(unittest.TestCase):

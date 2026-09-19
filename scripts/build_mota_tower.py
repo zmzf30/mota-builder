@@ -105,7 +105,7 @@ MAX_FLOOR_CONCURRENCY = 4
 DEFAULT_CODEX_CONFIG = [
     'service_tier="priority"',
 ]
-AGENT_BACKENDS = ("codex", "opencode")
+AGENT_BACKENDS = ("codex", "opencode", "copilot")
 DEFAULT_MAX_ATTEMPTS = 4
 OPENCODE_DEFAULT_MAX_ATTEMPTS = 6
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
@@ -5181,6 +5181,26 @@ def build_opencode_command(args: argparse.Namespace, prompt_path: Path) -> list[
     return cmd
 
 
+def build_copilot_command(args: argparse.Namespace) -> list[str]:
+    cmd = [
+        args.copilot_bin,
+        "-C",
+        str(args.repo_root),
+        "--silent",
+        "--stream",
+        "off",
+        "--no-color",
+        "--no-ask-user",
+        "--available-tools=",
+        "--deny-tool=shell",
+        "--deny-tool=write",
+    ]
+    if args.model:
+        cmd += ["--model", args.model]
+    cmd += args.copilot_arg
+    return cmd
+
+
 def agent_command_for_subprocess(cmd: list[str]) -> list[str]:
     if sys.platform != "darwin":
         return cmd
@@ -5216,6 +5236,8 @@ def agent_exec(
         return codex_exec(args, prompt, schema, output_path)
     if args.agent_backend == "opencode":
         return opencode_exec(args, prompt, schema, output_path)
+    if args.agent_backend == "copilot":
+        return copilot_exec(args, prompt, schema, output_path)
     raise PipelineError(f"Unsupported agent backend: {args.agent_backend}")
 
 
@@ -5313,6 +5335,45 @@ def opencode_exec(
                 + f"stderr:\n{result.stderr}"
             ) from exc
         write_json(output_path, parsed)
+    return parsed
+
+
+def copilot_exec(
+    args: argparse.Namespace,
+    prompt: str,
+    schema: dict[str, Any],
+    output_path: Path,
+) -> dict[str, Any]:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    full_prompt = prompt_with_inline_schema(prompt, schema)
+    if args.keep_prompts:
+        output_path.with_name(output_path.name + ".prompt.md").write_text(full_prompt + "\n", encoding="utf-8")
+    cmd = build_copilot_command(args) + ["--log-dir", str(output_path.parent / ".copilot-logs")]
+    result = subprocess.run(
+        agent_command_for_subprocess(cmd),
+        input=full_prompt,
+        text=True,
+        capture_output=True,
+        timeout=args.timeout,
+    )
+    if result.returncode != 0:
+        raise PipelineError(
+            "copilot failed\n"
+            + f"command: {' '.join(cmd)}\n"
+            + f"stdout:\n{result.stdout}\n"
+            + f"stderr:\n{result.stderr}"
+        )
+    try:
+        parsed = load_json_object(result.stdout)
+    except (json.JSONDecodeError, PipelineError) as exc:
+        raise PipelineError(
+            "copilot output must contain a JSON object.\n"
+            + f"command: {' '.join(cmd)}\n"
+            + f"stdout parse error: {exc}\n"
+            + f"stdout:\n{result.stdout}\n"
+            + f"stderr:\n{result.stderr}"
+        ) from exc
+    write_json(output_path, parsed)
     return parsed
 
 
@@ -11199,7 +11260,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help=(
             f"Maximum staged generation attempts per floor. Defaults to {DEFAULT_MAX_ATTEMPTS} "
-            f"for codex and {OPENCODE_DEFAULT_MAX_ATTEMPTS} for opencode."
+            f"for codex/copilot and {OPENCODE_DEFAULT_MAX_ATTEMPTS} for opencode."
         ),
     )
     parser.add_argument(
@@ -11250,7 +11311,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument(
         "--model",
-        help="Model for internal calls. Both Codex and OpenCode use their configured default unless set explicitly.",
+        help="Model for internal calls. All backends use their configured default unless set explicitly.",
     )
     parser.add_argument("--profile", help="Optional Codex config profile.")
     parser.add_argument(
@@ -11261,6 +11322,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--codex-arg", action="append", default=[], help="Extra raw codex exec argument; repeatable.")
     parser.add_argument("--opencode-bin", default="opencode")
     parser.add_argument("--opencode-arg", action="append", default=[], help="Extra raw opencode run argument; repeatable.")
+    parser.add_argument("--copilot-bin", default="copilot")
+    parser.add_argument("--copilot-arg", action="append", default=[], help="Extra raw copilot argument; repeatable.")
     parser.add_argument(
         "--timeout",
         type=int,
@@ -11371,10 +11434,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         if args.profile:
             parser.error("--profile is only supported with --agent-backend codex")
         if args.config:
-            parser.error("--config is only supported with --agent-backend codex; use --opencode-arg for OpenCode")
+            parser.error(f"--config is only supported with --agent-backend codex; use --{args.agent_backend}-arg instead")
         if args.codex_arg:
-            parser.error("--codex-arg is only supported with --agent-backend codex; use --opencode-arg for OpenCode")
+            parser.error(f"--codex-arg is only supported with --agent-backend codex; use --{args.agent_backend}-arg instead")
         args.config = []
+    if args.opencode_arg and args.agent_backend != "opencode":
+        parser.error("--opencode-arg is only supported with --agent-backend opencode")
+    if args.copilot_arg and args.agent_backend != "copilot":
+        parser.error("--copilot-arg is only supported with --agent-backend copilot")
     if not args.self_test and not args.brief_file and not (args.idea_file or args.idea_text):
         parser.error("provide --idea-file or --idea-text, unless --brief-file is used")
     return args

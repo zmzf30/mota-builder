@@ -9,7 +9,7 @@ description: Agentic entry point for running the classic mota-js tower build pip
 
 Act as the thin agentic entry point for the tower build pipeline.
 
-Convert the user's natural-language request into parameters for `scripts/build_mota_tower.py`, then run the script. The script performs the actual code orchestration, calls headless Codex agents for brief generation, staged per-floor generation, staged review, and final browser playtest, then writes a generated `project/` directory under the output directory.
+Convert the user's natural-language request into parameters for `scripts/build_mota_tower.py`, then run the script. The script performs the actual code orchestration, calls headless Codex, OpenCode, or Copilot CLI agents for brief generation, staged per-floor generation and review, runs the final browser playtest, then writes a generated `project/` directory under the output directory.
 
 ## Boundary
 
@@ -70,16 +70,18 @@ python3 scripts/build_mota_tower.py --idea-text "<user idea>" --yes --parallel-f
 Prefer defaults unless the user gives a reason to change them.
 
 - `--out-dir`: Use a custom output directory only if the user requests one.
-- `--max-attempts`: Defaults to `4` for Codex and `6` for OpenCode. Raise the Codex default only for a harder design or if the user asks for more retries.
+- `--agent-backend codex|opencode|copilot`: Default to `codex`; use the requested backend when specified. Each CLI must already be installed and configured. Copilot means the standalone `copilot` CLI, not `gh copilot`.
+- `--max-attempts`: Defaults to `4` for Codex/Copilot and `6` for OpenCode. Raise the Codex/Copilot default only for a harder design or if the user asks for more retries.
 - `--parallel-floors`: Use only when the user accepts the tradeoff. It is faster but each floor must fit a preassigned budget contract instead of reacting to the actual previous accepted floor.
-- `--floor-concurrency`: Defaults to 4 for `--parallel-floors`; lower it if the user wants fewer simultaneous Codex calls. The script rejects values above 4.
+- `--floor-concurrency`: Defaults to 4 for `--parallel-floors`; lower it if the user wants fewer simultaneous agent calls. The script rejects values above 4.
 - Before floor generation, enemy-data generation runs its own projected-hero, floor-pool, and reviewer loop. Per-floor generation is staged: topology -> economy -> encounter. Economy places no doors or enemies; encounter jointly places doors, monsters, and specials. One final floor review follows encounter generation and routes repair to the earliest owning stage.
 - Browser playtest runs after each accepted floor by default using `playtest-mota-game`. Use `--skip-playtest` only when browser automation is unavailable or the user explicitly wants faster non-browser generation.
 - `--playtest-policy`: Defaults to `warn`, so playtest findings are reported but do not block generation. Use `fail` only when the user explicitly wants browser playtest issues to fail the pipeline.
-- `--model`: Codex uses its configured default model unless the user requests a specific model.
+- `--model`: All backends use their configured default model unless the user requests a specific model. Copilot also inherits its configured reasoning effort.
 - `--profile`: Set only if the user requests a Codex profile.
 - `--config`: The default only includes `service_tier="priority"`; reasoning effort follows the Codex CLI configuration. Pass additional explicit overrides only when needed.
 - `--codex-arg`: Pass through advanced raw Codex exec arguments only when necessary.
+- `--opencode-arg` / `--copilot-arg`: Pass through arguments only for the selected backend. Use `--copilot-bin` for a custom executable and `--copilot-arg=--reasoning-effort=high` for an explicit reasoning override. Do not pass Codex-only `--profile`, `--config`, or `--codex-arg` to these backends.
 - `--timeout`: Set for long full-tower runs or when the user asks for a time limit.
 - `--sandbox`: Keep `read-only` for planning. Use a broader sandbox only if later pipeline stages intentionally edit files.
 - `--floor-prefix` and `--floor-number-offset`: Set only if the user wants non-default floor IDs.

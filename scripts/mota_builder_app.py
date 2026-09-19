@@ -430,8 +430,8 @@ def normalize_form(form: dict[str, Any]) -> dict[str, Any]:
         errors.append("宝石跨层增长下限不能大于上限。")
     if normalized["potionFloorDeltaMin"] > normalized["potionFloorDeltaMax"]:
         errors.append("药水跨层增长下限不能大于上限。")
-    if normalized["agentBackend"] not in {"codex", "opencode"}:
-        errors.append("Agent 只能选择 codex 或 opencode。")
+    if normalized["agentBackend"] not in {"codex", "opencode", "copilot"}:
+        errors.append("Agent 只能选择 codex、opencode 或 copilot。")
     if normalized["timeoutMinutes"] not in TIMEOUT_OPTIONS:
         errors.append("超时时间只能选择 10、20、30、60、90、120 分钟。")
 
@@ -1429,7 +1429,10 @@ def discover_run_process_groups(run_id: str, run_dir: Path) -> set[int]:
             continue
         if run_id not in command and run_root not in command and output_root not in command:
             continue
-        if not any(marker in command for marker in ("build_mota_tower.py", "codex exec", "opencode")):
+        if not (
+            any(marker in command for marker in ("build_mota_tower.py", "codex exec", "opencode"))
+            or re.search(r"(?:^|\s)(?:\S*/)?copilot(?:\s|$)", command)
+        ):
             continue
         groups.add(pgid)
     return groups

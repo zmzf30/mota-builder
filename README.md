@@ -1,6 +1,6 @@
 # Mota Builder
 
-基于 `mota-js`、Python 和 AI Agent 终端（必须安装并配置 Agent CLI 环境，默认使用 Codex CLI，并沿用其默认模型和推理强度；同时也支持通过 `--agent-backend opencode` 使用 OpenCode）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
+基于 `mota-js`、Python 和 AI Agent 终端（必须安装并配置 Agent CLI 环境，默认使用 Codex CLI，并沿用其默认模型和推理强度；也支持通过 `--agent-backend opencode` 使用 OpenCode，或通过 `--agent-backend copilot` 使用 GitHub Copilot CLI）的 HTML5 魔塔制作工作区，并在样板工程之外补充了一套面向传统魔塔的 AI 造塔流水线。
 
 mota-js 是 HTML5 魔塔样板，需要您clone https://github.com/ckcz123/mota-js 并放在本仓库下，用于运行、编辑和作为生成流水线的模板；该目录体积较大且包含工程素材，已在根 `.gitignore` 中忽略，不提交到 Git。`skills/` 和 `scripts/build_mota_tower.py` 负责把自然语言需求拆成全塔设计、楼层拓扑、经济资源、怪物压力、审查修复和浏览器试玩等阶段，最终在 `build/` 下写出生成后的 `project/`。
 
@@ -25,9 +25,11 @@ python3 scripts/mota_builder_app.py
 
 UI 可选择“传统塔”或“红海塔”，默认传统塔。传统塔使用寒云谷、溯、CCW 的同风格 few-shot；红海塔使用红蓝的记忆、星月神话、dist、剑阁、出塞的同风格 few-shot。风格只控制地图结构和资源/怪物放置方式，不用于推断数值难度。
 
+高级选项中的 Agent 可选择 `codex`、`opencode` 或 `copilot`，默认 `codex`；各后端沿用对应 CLI 的默认模型配置。
+
 Web UI 仅建议基于 `mota-js` 样板生成新塔，不建议直接修改已有塔；暂不自动生成剧情、机关、脚本、事件、升级、商店、加点、新图块或非标准通行/阻挡图块。
 
-也可以打开 AI 终端（如 Codex 或 OpenCode），进入在本仓库目录，直接输入（目前不支持剧情、自定义脚本、特殊图块等，每层速度都较慢，一般建议生成10层左右或以内，否则速度极慢；）：
+也可以打开 AI 终端（如 Codex、OpenCode 或 Copilot CLI），进入在本仓库目录，直接输入（目前不支持剧情、自定义脚本、特殊图块等，每层速度都较慢，一般建议生成10层左右或以内，否则速度极慢；）：
 
 ```text
 我想直接一步生成一个 6 层、13x13、无剧情、高数值压力、传统钥匙门博弈的塔。
@@ -38,7 +40,7 @@ Web UI 仅建议基于 `mota-js` 样板生成新塔，不建议直接修改已�
 我想直接一步生成一个 6 层、13x13、无剧情、高数值压力、传统钥匙门博弈的魔塔。参数设定：初始生命1000、攻击10、防御10、金币0。初始钥匙：黄钥匙1、蓝钥匙0、红钥匙0。宝石：红宝石ATK+1、蓝宝石DEF+1。药水：红药水HP+50、蓝药水HP+100、黄药水HP+200、绿药水HP+500。整塔门总量约黄门30、蓝门15、红门5；钥匙总量约黄钥匙12、蓝钥匙3、红钥匙2。破墙镐3、炸弹3、中心对称飞行器1。怪物能力限制在白名单内（先攻、魔攻、坚固、领域、阻击）。每层需要至少3条分支路线、明显的路线选择压力、门钥匙博弈和战斗压力。
 ```
 
-AI 终端会代为调用本仓库的生成脚本，默认使用 Codex 后端，生成结果写入 `build/mota-tower/`，不会直接覆盖 `mota-js/project/`。如果要用 OpenCode，在提示词末尾追加：
+AI 终端会代为调用本仓库的生成脚本，默认使用 Codex 后端，生成结果写入 `build/mota-tower/`，不会直接覆盖 `mota-js/project/`。如果要用 OpenCode，在提示词末尾追加以下内容；使用 Copilot CLI 时将 `opencode` 换成 `copilot`：
 
 ```text
 使用 --agent-backend opencode。
@@ -99,8 +101,9 @@ AI 终端会代为调用本仓库的生成脚本，默认使用 Codex 后端，�
 运行 AI 造塔流水线：
 
 - Python 3
-- 已配置可用的 `codex` 命令行工具
+- 已配置可用的 `codex` 命令行工具（默认后端；选择其他后端时无需安装）
 - 可选：已配置可用的 `opencode` 命令行工具，用于 `--agent-backend opencode`
+- 可选：已安装并登录的 GitHub Copilot CLI（`copilot` 命令，不是 `gh copilot`），用于 `--agent-backend copilot`
 - 可选：Node.js 和 npm，仅用于开发者手动运行 Playwright 自动试玩脚本；本地 Web UI 和生成主流程不需要 Node.js。
 - 可访问本机浏览器环境；试玩会访问 `http://127.0.0.1:1055/`，必要时回退到 `1056`
 - 默认使用仓库内 `references/few-shot/corpus.json`，不依赖本机外部目录；只有重建或临时覆盖语料时才需要 `~/Documents/例子` 等原始参考项目目录。每个阶段会固定选择一个 generator/reviewer 共享锚点，再分别分配生成专用样例和 reviewer holdout；重试不会重新抽样。
@@ -180,7 +183,7 @@ python3 scripts/build_mota_tower.py \
 请在当前仓库中调用 scripts/build_mota_tower.py，一步生成一座 6 层、13x13、低剧情、高数值压力、传统钥匙门博弈的魔塔。使用默认 Codex 后端，不要直接覆盖 mota-js/project，输出到 build/mota-tower。
 ```
 
-如果要用 OpenCode，在提示词末尾追加：
+如果要用 OpenCode，在提示词末尾追加以下内容；使用 Copilot CLI 时将 `opencode` 换成 `copilot`：
 
 ```text
 使用 --agent-backend opencode。
@@ -195,12 +198,14 @@ python3 scripts/build_mota_tower.py \
 - `--brief-file <path>`：从已有 `tower_brief.json` 继续。
 - `--resume-existing`：复用输出目录中已有的楼层审查结果继续生成。
 - `--parallel-floors --floor-concurrency 4`：并发生成楼层，速度更快；每层资源预算优先读取 `floor_progression_plan[].resource_budget`，只有规划缺失、格式错误或合计不等于整塔预算时才记录错误并回退整数均分。传统塔战斗审查按初始 HP，加上此前楼层平均可获得的红/蓝宝石攻防来估算当前层勇士能力。
-- `--agent-backend codex|opencode`：选择内部 LLM 调用后端；默认 `codex`。
-- `--max-attempts <n>`：每层最大尝试次数；默认 Codex 为 `4`，OpenCode 为 `6`。
-- `--model <model>`：指定后端模型。Codex 和 OpenCode 默认都沿用各自 CLI 配置，只有显式设置时才会传 `--model`；OpenCode 通常写成 `provider/model`。
+- `--agent-backend codex|opencode|copilot`：选择内部 LLM 调用后端；默认 `codex`。
+- `--max-attempts <n>`：每层最大尝试次数；默认 Codex 和 Copilot 为 `4`，OpenCode 为 `6`。
+- `--model <model>`：指定后端模型。三个后端默认都沿用各自 CLI 配置，只有显式设置时才会传 `--model`；OpenCode 通常写成 `provider/model`。
 - `--config <key=value>`：额外传给 `codex exec` 的配置；Codex 默认仍会传 `service_tier="priority"`，推理强度沿用 Codex CLI 配置。
 - `--codex-arg <arg>`：额外传给 `codex exec` 的原始参数，可重复。
 - `--opencode-arg <arg>`：额外传给 `opencode run` 的原始参数，可重复。使用 OpenCode 时不会传 Codex 专用的 `model_reasoning_effort` 或 `service_tier`。
+- `--copilot-bin <path>`：指定 Copilot CLI 可执行文件，默认 `copilot`。
+- `--copilot-arg <arg>`：额外传给 Copilot CLI 的原始参数，可重复；以 `--` 开头的参数使用 `--copilot-arg=--reasoning-effort=high` 形式。默认沿用 Copilot 的模型和推理强度，不传 Codex 专用配置。
 - `--timeout <seconds>`：单次 agent 调用超时时间，默认 `1800` 秒（30 分钟）。
 - `--max-wall-similarity <0-1>`：相邻楼层墙体相似度上限，默认 `0.9`。
 - `--skip-playtest`：跳过浏览器试玩。
@@ -223,7 +228,17 @@ python3 scripts/build_mota_tower.py \
   --out-dir build/mota-tower-opencode
 ```
 
-Codex 后端使用 `codex exec --output-schema` 强制结构化输出；OpenCode 后端会把 JSON schema 写入 prompt 并解析最终输出，因此结构化稳定性取决于所选 OpenCode provider/model。
+Copilot CLI 示例：
+
+```bash
+python3 scripts/build_mota_tower.py \
+  --agent-backend copilot \
+  --idea-text "做一座 4 层、13x13、偏传统钥匙门博弈的魔塔" \
+  --brief-only \
+  --out-dir build/mota-tower-copilot
+```
+
+Codex 后端使用 `codex exec --output-schema` 强制结构化输出；OpenCode 和 Copilot 后端会把 JSON schema 写入 prompt 并解析最终输出，因此结构化稳定性取决于所选模型。Copilot 使用 stdin 传入完整 prompt，关闭交互提问和工具权限，仅返回 JSON，由 Python 写入产物；CLI 日志写入对应产物目录下的 `.copilot-logs/`。
 
 ## 浏览器试玩生成结果
 
